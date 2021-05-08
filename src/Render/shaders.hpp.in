@@ -1,0 +1,8 @@
+#pragma once
+
+namespace shader{
+
+    const char* mix_block_raycast_v=R"(@mix_block_raycast_v.glsl@)";
+
+    const char* mix_block_raycast_f=R"(@mix_block_raycast_f.glsl@)";
+}
