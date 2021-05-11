@@ -230,6 +230,15 @@ namespace sv {
             calc_coefficient();
         }
 
+        void reshape(float len){
+            left_up_pos=glm::normalize(left_up_pos-start_pos)*len+start_pos;
+            right_up_pos=glm::normalize(right_up_pos-start_pos)*len+start_pos;
+            left_down_pos=glm::normalize(left_down_pos-start_pos)*len+start_pos;
+            right_down_pos=glm::normalize(right_down_pos-start_pos)*len+start_pos;
+            is_valid_pyramid=can_get_valid_obb();
+            calc_coefficient();
+        }
+
         Pyramid(const Pyramid& pyramid){
             *this=pyramid;
         }

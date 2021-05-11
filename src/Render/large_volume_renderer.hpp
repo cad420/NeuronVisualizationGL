@@ -28,7 +28,6 @@ public:
 
     void set_transferfunc(std::map<uint8_t,std::array<double,4>>);
 
-
     void set_camera(std::tuple<std::array<float,3>,std::array<float,3>,std::array<float,3>,float,float,float>);
 
     void render();
@@ -55,6 +54,7 @@ private:
     void createGLTexture();
     void createGLSampler();
     void createGLShader();
+    void createPosFrameBuffer();
 
     //createCUDAResource
     void createCUgraphics();
@@ -63,6 +63,7 @@ private:
     //createUtilResource
     void createVirtualBoxes();
     void createMappingTable();
+    void createVolumeBoard();
 
     //setupRuntimeResource
 
@@ -111,8 +112,6 @@ private:
     std::vector<GLuint> volume_texes;
     std::list<BlockTableItem> volume_tex_manager;
 
-//    GLuint intersect_box_ssbo;
-//    GLuint* mapped_intersect_box_ptr= nullptr;
 
     GLuint mapping_table_ssbo;
     std::vector<uint32_t> mapping_table;
@@ -124,7 +123,7 @@ private:
     std::unordered_set<sv::AABB,Myhash> current_blocks;
     std::unordered_set<sv::AABB,Myhash> new_need_blocks,no_need_blocks;
     //some value for debug and imgui
-    int aabb_intersect_num,obb_intersect_num,pyramid_intersect_num,refined_intersect_num;
+    int aabb_intersect_num,obb_intersect_num,pyramid_intersect_num,refined_intersect_num,preload_pyramid_intersect_num;
 
 
     std::vector<CUgraphicsResource> cu_resources;
@@ -140,15 +139,23 @@ private:
     uint32_t window_width,window_height;
     GLFWwindow* window;
 
+    GLuint raycast_pos_fbo;
+    GLuint raycast_entry_tex;
+    GLuint raycast_exit_tex,raycast_pos_rbo;
+
     GLuint screen_quad_vao;
     GLuint screen_quad_vbo;
     std::array<GLfloat,24> screen_quad_vertices;//6 vertices for x y and u v
+
+    GLuint volume_vao;
+    GLuint volume_vbo,volume_ebo;
+    std::array<float,3> volume_board;
 
 
     std::unique_ptr<sv::RayCastCamera> camera;
 
     std::unique_ptr<sv::Shader> raycasting_shader;
-    std::unique_ptr<sv::Shader> intersect_shader;
+    std::unique_ptr<sv::Shader> raycast_pos_shader;
 
 };
 #endif //NEURONVISUALIZATIONGL_LARGE_VOLUME_RENDERER_H

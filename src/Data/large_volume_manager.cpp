@@ -214,12 +214,16 @@ void LargeVolumeManager::startWorking() {
 //                        std::cout<<"start job"<<std::endl;
                         std::vector<std::vector<uint8_t>> packet;
 //                        spdlog::info("get packet");
+
                         volume_reader->read_packet(block_desc.block_index[3],{block_desc.block_index[0],block_desc.block_index[1],block_desc.block_index[2]},packet);
-//                        spdlog::info("get cuda mem");
+
+                        //                        spdlog::info("get cuda mem");
 //                        std::cout<<products.size()<<std::endl;
                         auto& cu_mem=cu_mem_pool->getCUMem();
 //                        spdlog::info("start uncompress");
+                        START_CPU_TIMER
                         workers[idx].uncompress((uint8_t*)cu_mem.data_ptr,cu_mem_pool->getBlockSizeBytes(),packet);
+                        END_CPU_TIMER
 //                        spdlog::info("finish uncompress");
                         block_desc.data_ptr=cu_mem.data_ptr;
                         block_desc.size=cu_mem_pool->getBlockSizeBytes();

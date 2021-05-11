@@ -34,27 +34,31 @@ void LargeVolumeRenderer::set_volume(const char *volume_file) {
 }
 #define B_TF_TEX_BINDING 0
 #define B_PTF_TEX_BINDING 1
-#define B_VOL_TEX_0_BINDING 2
-#define B_VOL_TEX_1_BINDING 3
-#define B_VOL_TEX_2_BINDING 4
-#define B_VOL_TEX_3_BINDING 5
-#define B_VOL_TEX_4_BINDING 6
+#define B_POS_ENTRY_BINDING 2
+#define B_POS_EXIT_BINDING 3
+#define B_VOL_TEX_0_BINDING 4
+#define B_VOL_TEX_1_BINDING 5
+#define B_VOL_TEX_2_BINDING 6
+#define B_VOL_TEX_3_BINDING 7
+#define B_VOL_TEX_4_BINDING 8
+
+
 void LargeVolumeRenderer::bindGLTextureUnit() {
     std::cout<<__FUNCTION__ <<std::endl;
     GL_EXPR(glBindTextureUnit(B_TF_TEX_BINDING,transfer_func_tex));
     GL_EXPR(glBindTextureUnit(B_PTF_TEX_BINDING,preInt_tf_tex));
-
     GL_EXPR(glBindTextureUnit(B_VOL_TEX_0_BINDING,volume_texes[0]));
     GL_EXPR(glBindTextureUnit(B_VOL_TEX_1_BINDING,volume_texes[1]));
     GL_EXPR(glBindTextureUnit(B_VOL_TEX_2_BINDING,volume_texes[2]));
     GL_EXPR(glBindTextureUnit(B_VOL_TEX_3_BINDING,volume_texes[3]));
-    GL_EXPR(glBindTextureUnit(B_VOL_TEX_4_BINDING,volume_texes[4]));
+//    GL_EXPR(glBindTextureUnit(B_VOL_TEX_4_BINDING,volume_texes[4]));
+
 
     glBindSampler(B_VOL_TEX_0_BINDING,gl_sampler);
     glBindSampler(B_VOL_TEX_1_BINDING,gl_sampler);
     glBindSampler(B_VOL_TEX_2_BINDING,gl_sampler);
     glBindSampler(B_VOL_TEX_3_BINDING,gl_sampler);
-    glBindSampler(B_VOL_TEX_4_BINDING,gl_sampler);
+//    glBindSampler(B_VOL_TEX_4_BINDING,gl_sampler);
 
     GL_CHECK
 }
@@ -71,12 +75,12 @@ void LargeVolumeRenderer::setupShaderUniform() {
 
     raycasting_shader->setInt("transfer_func",B_TF_TEX_BINDING);
     raycasting_shader->setInt("preInt_transfer_func",B_PTF_TEX_BINDING);
+
     raycasting_shader->setInt("cache_volume0",B_VOL_TEX_0_BINDING);
     raycasting_shader->setInt("cache_volume1",B_VOL_TEX_1_BINDING);
     raycasting_shader->setInt("cache_volume2",B_VOL_TEX_2_BINDING);
     raycasting_shader->setInt("cache_volume3",B_VOL_TEX_3_BINDING);
-    raycasting_shader->setInt("cache_volume4",B_VOL_TEX_4_BINDING);
-
+//    raycasting_shader->setInt("cache_volume4",B_VOL_TEX_4_BINDING);
 
     raycasting_shader->setVec4("bg_color",0.f,0.f,0.f,0.f);
     raycasting_shader->setInt("block_length",block_length);
@@ -84,6 +88,8 @@ void LargeVolumeRenderer::setupShaderUniform() {
     raycasting_shader->setIVec3("block_dim",block_dim[0],block_dim[1],block_dim[2]);
     raycasting_shader->setIVec3("texture_size3",vol_tex_block_nx*block_length,
                                 vol_tex_block_ny*block_length,vol_tex_block_nz*block_length);
+    raycasting_shader->setVec3("board_length",volume_board[0],volume_board[1],volume_board[1]);
+
 
     raycasting_shader->setFloat("ka",0.5f);
     raycasting_shader->setFloat("kd",0.8f);
@@ -116,13 +122,13 @@ void LargeVolumeRenderer::render() {
 
     setupRuntimeResource();
 
-    float last_frame_t=0.f;
+    double last_frame_t=0.0;
 
     std::cout<<"start render"<<std::endl;
     while(!glfwWindowShouldClose(window)){
 
-        float current_frame_t=glfwGetTime();
-        float delta_t=current_frame_t-last_frame_t;
+        double current_frame_t=glfwGetTime();
+        double delta_t=current_frame_t-last_frame_t;
         last_frame_t=current_frame_t;
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -148,18 +154,50 @@ void LargeVolumeRenderer::render() {
                 block.release();
             }
         }
-//        mapping_table[0]=mapping_table[1]=mapping_table[2]=mapping_table[3]=1;
+
         uploadMappingTable();
-        int cnt=0;
-        for(int i=0;i<mapping_table.size()/4;i++){
-            if(mapping_table[i*4+3]!=0)
-                cnt++;
-        }
 
         updateCameraUniform();
 
+        bool is_inside=false;
         //render volume
         {
+            glm::mat4 view=camera->getViewMatrix();
+
+            glm::mat4 projection=glm::perspective(glm::radians(camera->fov),
+                                                  (float)window_width/(float)window_height,
+                                                  1.f,50000.0f);
+            glm::mat4 mvp=projection*view;
+            raycast_pos_shader->use();
+            raycast_pos_shader->setMat4("MVPMatrix",mvp);
+            raycast_pos_shader->setVec3("camera_pos",camera->camera_pos);
+            raycast_pos_shader->setVec3("board_length",volume_board[0],volume_board[1],volume_board[2]);
+
+            if(camera->camera_pos.x<volume_board[0] && camera->camera_pos.y<volume_board[1] && camera->camera_pos.z<volume_board[2]
+            && camera->camera_pos.x>0.f && camera->camera_pos.y>0.f && camera->camera_pos.z>0.f){
+
+                is_inside=true;
+            }
+            raycast_pos_shader->setBool("inside",is_inside);
+            glBindFramebuffer(GL_FRAMEBUFFER,raycast_pos_fbo);
+            glBindVertexArray(volume_vao);
+            glDrawBuffer(GL_COLOR_ATTACHMENT0);
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            raycast_pos_shader->setBool("entry",true);
+            glDrawElements(GL_TRIANGLES,36,GL_UNSIGNED_INT,0);
+
+            glEnable(GL_CULL_FACE);
+            glFrontFace(GL_CCW);
+            glDrawBuffer(GL_COLOR_ATTACHMENT1);
+            glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
+            glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+            raycast_pos_shader->setBool("entry",false);
+            glDrawElements(GL_TRIANGLES,36,GL_UNSIGNED_INT,0);
+            glDisable(GL_CULL_FACE);
+
+            glBindFramebuffer(GL_FRAMEBUFFER,0);
+
             raycasting_shader->use();
 
             glBindVertexArray(screen_quad_vao);
@@ -176,15 +214,17 @@ void LargeVolumeRenderer::render() {
             {
                 ImGui::Begin("Large Volume Renderer");
                 ImGui::Text("FPS: %.1f",ImGui::GetIO().Framerate);
+                ImGui::Text("volume board %f %f %f",volume_board[0],volume_board[1],volume_board[2]);
                 ImGui::InputFloat3("camera pos",&camera->camera_pos.x);
                 ImGui::InputFloat3("view direction",&camera->view_direction.x);
                 ImGui::InputFloat("camera fov",&camera->fov);
                 ImGui::InputFloat("camera f",&camera->f);
+                ImGui::Text("inside board: %d",is_inside);
 //                ImGui::SliderFloat("camera f",&camera->f,512.f,4096.f);
                 ImGui::SliderFloat("step",&camera->space_z,0.f,1.f);
                 ImGui::Text("intersect num: aabb(%d), obb(%d), pyramid(%d)",aabb_intersect_num,obb_intersect_num,pyramid_intersect_num);
+                ImGui::Text("preload pyramid intersect num: %d",preload_pyramid_intersect_num);
                 ImGui::Text("refined intersect num: %d",refined_intersect_num);
-                ImGui::Text("mapping table: %d",cnt);
                 ImGui::Text("max_dedicated_video_mem: %d GB",max_dedicated_video_mem>>20);
                 ImGui::Text("total_available_mem: %d GB",total_available_mem>>20);
                 ImGui::Text("current_available_mem: %d GB",current_available_mem>>20);
@@ -197,9 +237,10 @@ void LargeVolumeRenderer::render() {
         }
 
         glfwSwapBuffers(window);
+        while(glfwGetTime()<last_frame_t+1.0/15){
 
+        }
     }
-    glfwTerminate();
 }
 
 void LargeVolumeRenderer::updateCameraUniform() {
@@ -235,6 +276,43 @@ void LargeVolumeRenderer::createVirtualBoxes() {
         }
     }
 }
+void LargeVolumeRenderer::createVolumeBoard() {
+    float board_x=lod_block_dim[min_lod][0]*no_padding_block_length;
+    float board_y=lod_block_dim[min_lod][1]*no_padding_block_length;
+    float board_z=lod_block_dim[min_lod][2]*no_padding_block_length;
+    volume_board={board_x,board_y,board_z};
+    std::cout<<"max board: "<<board_x<<" "<<board_y<<" "<<board_z<<std::endl;
+    std::array<std::array<float,3>,8> board_cube;
+    board_cube[0]={0.0f,0.0f,0.0f};
+    board_cube[1]={board_x,0.0f,0.0f};
+    board_cube[2]={board_x,board_y,0.0f};
+    board_cube[3]={0.0f,board_y,0.0f};
+    board_cube[4]={0.0f,0.0f,board_z};
+    board_cube[5]={board_x,0.0f,board_z};
+    board_cube[6]={board_x,board_y,board_z};
+    board_cube[7]={0.0f,board_y,board_z};
+    std::array<GLuint,36> board_cube_indices={
+            0,1,2,0,2,3,
+            0,4,1,4,5,1,
+            1,5,6,6,2,1,
+            6,7,2,7,3,2,
+            7,4,3,3,4,0,
+            4,7,6,4,6,5
+    };
+
+    glGenVertexArrays(1,&volume_vao);
+    glGenBuffers(1,&volume_vbo);
+    glGenBuffers(1,&volume_ebo);
+    glBindVertexArray(volume_vao);
+    glBindBuffer(GL_ARRAY_BUFFER,volume_vbo);
+    glBufferData(GL_ARRAY_BUFFER,sizeof(board_cube),board_cube.data(),GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER,volume_ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,sizeof(board_cube_indices),board_cube_indices.data(),GL_STATIC_DRAW);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+}
+
 void LargeVolumeRenderer::createGLTexture() {
     spdlog::info("{0}",__FUNCTION__ );
     assert(block_length && vol_tex_block_nx && vol_tex_block_ny && vol_tex_block_nz && vol_tex_num);
@@ -274,8 +352,8 @@ void LargeVolumeRenderer::refineCurrentIntersectBlocks(std::unordered_set<sv::AA
     for(auto& block:blocks){
         auto block_pos=(block.max_p+block.min_p)/2.f;
         float dist=glm::length(block_pos-camera->camera_pos);
-//        uint32_t dist_lod=dist/no_padding_block_length+min_lod;
-        uint32_t dist_lod=std::log2(dist/no_padding_block_length+1)+min_lod;
+        uint32_t dist_lod=dist/no_padding_block_length+min_lod;
+//        uint32_t dist_lod=std::log2(dist/no_padding_block_length+1)+min_lod;
         dist_lod=dist_lod>max_lod?max_lod:dist_lod;
         assert(block.index[3]==min_lod);
         int t=std::pow(2,dist_lod-min_lod);
@@ -299,7 +377,7 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid& view_pyramid) {
     std::unordered_set<sv::AABB,Myhash> current_aabb_intersect_blocks;
     std::unordered_set<sv::AABB,Myhash> current_obb_intersect_blocks;
     std::unordered_set<sv::AABB,Myhash> current_pyramid_intersect_blocks;
-
+    std::unordered_set<sv::AABB,Myhash> preload_pyramid_intersect_blocks;
 
 
     for(auto& it:virtual_blocks[min_lod]){
@@ -311,24 +389,32 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid& view_pyramid) {
     aabb_intersect_num=current_aabb_intersect_blocks.size();
 
 
-//    for(auto& it:current_aabb_intersect_blocks){
-//        if(view_obb.intersect_obb(it.convertToOBB())){
-//            current_obb_intersect_blocks.insert(it);
-//        }
-//    }
+    for(auto& it:current_aabb_intersect_blocks){
+        if(view_obb.intersect_obb(it.convertToOBB())){
+            current_obb_intersect_blocks.insert(it);
+        }
+    }
 
     obb_intersect_num=current_obb_intersect_blocks.size();
 
 
-//    for(auto&it :current_obb_intersect_blocks){
-//        if(view_pyramid.intersect_aabb(it)){
-//            current_pyramid_intersect_blocks.insert(it);
-//        }
-//    }
+    for(auto&it :current_obb_intersect_blocks){
+        if(view_pyramid.intersect_aabb(it)){
+            current_pyramid_intersect_blocks.insert(it);
+        }
+    }
 
     pyramid_intersect_num=current_pyramid_intersect_blocks.size();
 
-    current_pyramid_intersect_blocks=std::move(current_aabb_intersect_blocks);
+    auto preload_view_pyramid=view_pyramid;
+    preload_view_pyramid.reshape(1024.f);
+    for(auto& it:current_pyramid_intersect_blocks){
+        if(preload_view_pyramid.intersect_aabb(it)){
+            preload_pyramid_intersect_blocks.insert(it);
+        }
+    }
+    preload_pyramid_intersect_num=preload_pyramid_intersect_blocks.size();
+//    current_pyramid_intersect_blocks=std::move(current_aabb_intersect_blocks);
 
     refineCurrentIntersectBlocks(current_pyramid_intersect_blocks);
 
@@ -563,7 +649,7 @@ void LargeVolumeRenderer::setupSystemInfo() {
     vol_tex_block_nx=4;
     vol_tex_block_ny=2;
     vol_tex_block_nz=2;
-    vol_tex_num=5;
+    vol_tex_num=4;
     uint64_t single_texture_size=((uint64_t)vol_tex_block_nx*vol_tex_block_ny*vol_tex_block_nz*block_length*block_length*block_length)/1024;
     std::cout<<"single_texture_size: "<<single_texture_size<<std::endl;
     if(single_texture_size*vol_tex_num>current_available_mem){
@@ -637,9 +723,10 @@ void LargeVolumeRenderer::initCUDA() {
 }
 
 void LargeVolumeRenderer::createResource() {
+    createUtilResource();
     createGLResource();
     createCUDAResource();
-    createUtilResource();
+
 }
 
 void LargeVolumeRenderer::createGLResource() {
@@ -650,6 +737,8 @@ void LargeVolumeRenderer::createGLResource() {
     createVolumeTexManager();
     createMappingTable();
     createScreenQuad();
+    createVolumeBoard();
+    createPosFrameBuffer();
     createGLShader();
 }
 
@@ -669,6 +758,7 @@ void LargeVolumeRenderer::createCUgraphics() {
 
 void LargeVolumeRenderer::createUtilResource() {
     createVirtualBoxes();
+
 }
 void LargeVolumeRenderer::createScreenQuad() {
     spdlog::info("{0}",__FUNCTION__ );
@@ -692,6 +782,41 @@ void LargeVolumeRenderer::createScreenQuad() {
     glVertexAttribPointer(1,2,GL_FLOAT,GL_FALSE,4*sizeof(float),(void*)(2*sizeof(float)));
     glEnableVertexAttribArray(1);
     glBindVertexArray(0);
+}
+
+void LargeVolumeRenderer::createPosFrameBuffer() {
+    glGenFramebuffers(1,&raycast_pos_fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER,raycast_pos_fbo);
+
+    glGenTextures(1,&raycast_entry_tex);
+    glBindTexture(GL_TEXTURE_2D,raycast_entry_tex);
+    glBindTextureUnit(B_POS_ENTRY_BINDING,raycast_entry_tex);
+    glTextureStorage2D(raycast_entry_tex,1,GL_RGBA32F,window_width,window_height);
+    glBindImageTexture(0,raycast_entry_tex,0,GL_FALSE,0,GL_READ_ONLY,GL_RGBA32F);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT0,GL_TEXTURE_2D,raycast_entry_tex,0);
+
+    GL_CHECK;
+
+    glGenRenderbuffers(1,&raycast_pos_rbo);
+    glBindRenderbuffer(GL_RENDERBUFFER,raycast_pos_rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER,GL_DEPTH24_STENCIL8,window_width,window_height);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, raycast_pos_rbo);
+
+    glGenTextures(1,&raycast_exit_tex);
+    glBindTexture(GL_TEXTURE_2D,raycast_exit_tex);
+    glBindTextureUnit(B_POS_EXIT_BINDING,raycast_exit_tex);
+    glTextureStorage2D(raycast_exit_tex,1,GL_RGBA32F,window_width,window_height);
+    glBindImageTexture(1,raycast_exit_tex,0,GL_FALSE,0,GL_READ_ONLY,GL_RGBA32F);
+    glFramebufferTexture2D(GL_FRAMEBUFFER,GL_COLOR_ATTACHMENT1,GL_TEXTURE_2D,raycast_exit_tex,0);
+
+    GL_CHECK
+
+    if(glCheckFramebufferStatus(GL_FRAMEBUFFER)!=GL_FRAMEBUFFER_COMPLETE){
+        throw std::runtime_error("Framebuffer object is not complete!");
+    }
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+    GL_CHECK
 }
 
 
@@ -744,8 +869,8 @@ void LargeVolumeRenderer::createGLSampler() {
 }
 
 void LargeVolumeRenderer::createGLShader() {
-    intersect_shader=std::make_unique<sv::Shader>("C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\block_intersect_v.glsl",
-                                                  "C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\block_intersect_f.glsl");
+    raycast_pos_shader=std::make_unique<sv::Shader>("C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\raycast_pos_v.glsl",
+                                                    "C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\raycast_pos_f.glsl");
     raycasting_shader=std::make_unique<sv::Shader>("C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\mix_block_raycast_v.glsl",
                                                    "C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\mix_block_raycast_f.glsl");
 }
@@ -753,6 +878,7 @@ void LargeVolumeRenderer::deleteResource() {
     deleteCUDAResource();
     deleteGLResource();
     deleteUtilResource();
+
 }
 
 void LargeVolumeRenderer::deleteGLResource() {
@@ -765,6 +891,8 @@ void LargeVolumeRenderer::deleteGLResource() {
     glDeleteBuffers(1,&screen_quad_vbo);
     GL_EXPR(glDeleteTextures(volume_texes.size(),volume_texes.data()));
 
+    GL_CHECK
+    glfwTerminate();
 }
 
 void LargeVolumeRenderer::deleteCUDAResource() {
@@ -884,6 +1012,9 @@ void LargeVolumeRenderer::setupControl() {
         }
     };
 }
+
+
+
 
 
 

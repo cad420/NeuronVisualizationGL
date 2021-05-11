@@ -11,7 +11,7 @@
 #include<VoxelCompression/voxel_compress/VoxelCmpDS.h>
 #include<list>
 
-#define WORKER_NUM 3
+#define WORKER_NUM 2
 class Worker;
 
 class CUMemPool;

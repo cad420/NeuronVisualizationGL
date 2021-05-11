@@ -190,7 +190,7 @@ namespace sv {
             obb.half_wz=(n+f)/2.f;
             obb.updateHalfLenVec();
         }
-
+        glm::mat4 RayCastCamera::getViewMatrix();
         void processMovementByKey(CameraMoveDirection direction,float delta_t);
         void processMouseMove(float xoffset,float yoffset);
         void processMouseScroll(float yoffset);
@@ -232,7 +232,11 @@ namespace sv {
     };
 
 
+    inline glm::mat4 RayCastCamera::getViewMatrix()
+    {
 
+        return glm::lookAt(camera_pos,camera_pos+view_direction,up);
+    }
 
     inline void RayCastCamera::updateSpaceXY() {
         this->space_y=this->f*tanf(glm::radians(fov/2))/this->half_y_n;
@@ -289,8 +293,8 @@ namespace sv {
             if(fov<0.1f){
                 fov=0.1f;
             }
-            else if(fov>45.f){
-                fov=45.f;
+            else if(fov>60.f){
+                fov=60.f;
             }
             updateSpaceXY();
         }
