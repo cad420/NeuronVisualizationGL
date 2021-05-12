@@ -89,6 +89,7 @@ private:
     bool updateCurrentBlocks(const sv::Pyramid& view_pyramid);
     void refineCurrentIntersectBlocks(std::unordered_set<sv::AABB,Myhash>&);
     auto getBlockRequestInfo()->BlockReqInfo;
+    bool isValidBlock(std::array<uint32_t,4>);
     void updateNewNeedBlocksInCache();
     void uploadMappingTable();
     bool getTexturePos(const std::array<uint32_t,4>&,std::array<uint32_t,4>&);
@@ -122,6 +123,8 @@ private:
 
     std::unordered_set<sv::AABB,Myhash> current_blocks;
     std::unordered_set<sv::AABB,Myhash> new_need_blocks,no_need_blocks;
+
+    int no_need_block_num,new_need_block_num;
     //some value for debug and imgui
     int aabb_intersect_num,obb_intersect_num,pyramid_intersect_num,refined_intersect_num,preload_pyramid_intersect_num;
 

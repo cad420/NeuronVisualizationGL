@@ -110,8 +110,8 @@ void main()
 //            }
             cur_lod+=1;
             if(cur_lod>max_lod){
-                color=vec4(0.f,1.f,0.f,1.f);
-//                break;
+//                color=vec4(0.f,1.f,0.f,1.f);
+                break;
             }
             lod_t*=2;
             lod_step=lod_t*step;
@@ -135,9 +135,10 @@ void main()
 
         }
         else if(return_flag==2){
-            discard;
+//            discard;
 
-//            color=vec4(0.f,0.f,1.f,1.f);
+            color=vec4(0.f,0.f,1.f,1.f);
+            break;
         }
 
 

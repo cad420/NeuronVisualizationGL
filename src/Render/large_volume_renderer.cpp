@@ -147,7 +147,10 @@ void LargeVolumeRenderer::render() {
 
             BlockDesc block;
             while(volume_manager->getBlock(block)){
-                copyDeviceToTexture(block.data_ptr,block.block_index);
+                //if block not in current_blocks ?
+                if(isValidBlock(block.block_index)){
+                    copyDeviceToTexture(block.data_ptr,block.block_index);
+                }
 
                 volume_manager->updateCUMemPool(block.data_ptr);
 
@@ -348,12 +351,14 @@ void LargeVolumeRenderer::createVolumeTexManager() {
 
 
 void LargeVolumeRenderer::refineCurrentIntersectBlocks(std::unordered_set<sv::AABB, Myhash> &blocks) {
+//    static int lod_map_table[]={0,0,1,2,3,4,5,6,6,6,6,6};
     std::unordered_set<sv::AABB, Myhash> refined_blocks;
     for(auto& block:blocks){
         auto block_pos=(block.max_p+block.min_p)/2.f;
-        float dist=glm::length(block_pos-camera->camera_pos);
-        uint32_t dist_lod=dist/no_padding_block_length+min_lod;
-//        uint32_t dist_lod=std::log2(dist/no_padding_block_length+1)+min_lod;
+        auto view_pos=camera->camera_pos;
+        float dist=glm::length(block_pos-view_pos);
+//        uint32_t dist_lod=dist/no_padding_block_length+min_lod;
+        uint32_t dist_lod=std::log2(dist/no_padding_block_length+1)+min_lod;
         dist_lod=dist_lod>max_lod?max_lod:dist_lod;
         assert(block.index[3]==min_lod);
         int t=std::pow(2,dist_lod-min_lod);
@@ -433,53 +438,46 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid& view_pyramid) {
             new_need_blocks.insert(it);
         }
     }
-
+    new_need_block_num=new_need_blocks.size();
     for(auto& it:current_blocks){
         if(current_pyramid_intersect_blocks.find(it) == current_pyramid_intersect_blocks.cend()){
             no_need_blocks.insert(it);
         }
     }
+    no_need_block_num=no_need_blocks.size();
+
+//    std::cout<<"total no need block num: "<<no_need_block_num<<"\tlod no need block num: "<<lod_no_need_blocks.size()<<"\tnew need block num: "<<new_need_block_num<<std::endl;
+
 //    std::cout<<"new size: "<<new_need_blocks.size()<<std::endl;
 //    std::cout<<"no size: "<<no_need_blocks.size()<<std::endl;
     current_blocks=std::move(current_pyramid_intersect_blocks);
 
-    for(auto&it :no_need_blocks){
-        uint32_t flat_idx=(it.index[2]*lod_block_dim[it.index[3]][0]*lod_block_dim[it.index[3]][1]+it.index[1]*lod_block_dim[it.index[3]][0]+it.index[0])*4+lod_mapping_table_offset[it.index[3]];
-        mapping_table[flat_idx+3]&=0x0000ffff;
-//        std::cout<<"update no need block: ";
-//        print_array(it.index);
-    }
-    for(auto& it:new_need_blocks){
-        uint32_t flat_idx=(it.index[2]*lod_block_dim[it.index[3]][0]*lod_block_dim[it.index[3]][1]+it.index[1]*lod_block_dim[it.index[3]][0]+it.index[0])*4+lod_mapping_table_offset[it.index[3]];
-        mapping_table[flat_idx+3]|=0x00020000;//loading...
-//        std::cout<<"update new need blocks: ";
-//        print_array(it.index);
-    }
-
-
+//    for(auto&it :no_need_blocks){
+//        uint32_t flat_idx=(it.index[2]*lod_block_dim[it.index[3]][0]*lod_block_dim[it.index[3]][1]+it.index[1]*lod_block_dim[it.index[3]][0]+it.index[0])*4+lod_mapping_table_offset[it.index[3]];
+//        mapping_table[flat_idx+3]&=0x0000ffff;
+////        std::cout<<"update no need block: ";
+////        print_array(it.index);
+//    }
+//    for(auto& it:new_need_blocks){
+//        uint32_t flat_idx=(it.index[2]*lod_block_dim[it.index[3]][0]*lod_block_dim[it.index[3]][1]+it.index[1]*lod_block_dim[it.index[3]][0]+it.index[0])*4+lod_mapping_table_offset[it.index[3]];
+//        mapping_table[flat_idx+3]&=0x0000ffff;//first clear then assign
+//        mapping_table[flat_idx+3]|=0x00020000;//loading...
+////        std::cout<<"update new need blocks: ";
+////        print_array(it.index);
+//    }
 
     for(auto& it:volume_tex_manager){
         auto t=sv::AABB(it.block_index);
         //not find
-        if(current_blocks.find(t)==current_blocks.cend()){
+        if(no_need_blocks.find(t)!=no_need_blocks.cend()){
             it.valid=false;
-            //update mapping_table
-//            print_array(it.block_index);
-//            if(it.block_index[0]!=INVALID){
-//                uint32_t flat_idx=(it.block_index[2]*block_dim[0]*block_dim[1]+it.block_index[1]*block_dim[0]+it.block_index[0])*4+lod_mapping_table_offset[it.block_index[3]];
-//                mapping_table[flat_idx+3]&=0x0000ffff;//really not need
-//            }
+
         }
         else{
-            assert(it.valid==true || (it.valid==false && it.cached==true));
+//            assert(it.valid==true || (it.valid==false && it.cached==true));
 
         }
     }
-
-//    {
-//        new_need_blocks.clear();
-//        no_need_blocks.clear();
-//    }
 
     return true;
 }
@@ -516,6 +514,16 @@ void LargeVolumeRenderer::updateNewNeedBlocksInCache() {
         }
     }
 }
+
+bool LargeVolumeRenderer::isValidBlock(std::array<uint32_t,4> idx) {
+    for(auto&it :current_blocks){
+        if(it.index==idx){
+            return true;
+        }
+    }
+    return false;
+}
+
 
 void LargeVolumeRenderer::copyDeviceToTexture(CUdeviceptr ptr, std::array<uint32_t, 4> idx) {
     spdlog::info("{0}",__FUNCTION__ );
@@ -569,6 +577,10 @@ void LargeVolumeRenderer::copyDeviceToTexture(CUdeviceptr ptr, std::array<uint32
             if(cached){
                 assert(it.cached==true && it.block_index==idx);
             }
+            if(it.block_index!=idx && it.block_index[0]!=INVALID){//set mapping_table flag 0
+                uint32_t flat_idx=(it.block_index[2]*lod_block_dim[it.block_index[3]][0]*lod_block_dim[it.block_index[3]][1]+it.block_index[1]*lod_block_dim[it.block_index[3]][0]+it.block_index[0])*4+lod_mapping_table_offset[it.block_index[3]];
+                mapping_table[flat_idx+3]&=0x0000ffff;
+            }
             it.block_index=idx;
             it.valid=true;
             it.cached=true;
@@ -580,7 +592,7 @@ void LargeVolumeRenderer::copyDeviceToTexture(CUdeviceptr ptr, std::array<uint32
     mapping_table[flat_idx+0]=tex_pos_index[0];
     mapping_table[flat_idx+1]=tex_pos_index[1];
     mapping_table[flat_idx+2]=tex_pos_index[2];
-    assert(((mapping_table[flat_idx+3]>>16)&0x0000000f)==2);
+//    assert(((mapping_table[flat_idx+3]>>16)&0x0000000f)==2);
     mapping_table[flat_idx+3]=tex_pos_index[3]|(0x00010000);
 //    print(tex_pos_index[0]," ",tex_pos_index[1]," ",tex_pos_index[2]," ",tex_pos_index[3]&(0x0000ffff));
 //    print_array(idx);
@@ -592,13 +604,13 @@ bool LargeVolumeRenderer::getTexturePos(const std::array<uint32_t, 4> &idx, std:
             pos=it.pos_index;
             return true;
         }
-        else if(it.block_index==idx && !it.cached && !it.valid){
-            pos=it.pos_index;
-            return false;
-        }
+//        else if(it.block_index==idx && !it.cached && !it.valid){
+//            pos=it.pos_index;
+//            return false;
+//        }
     }
     for(auto& it:volume_tex_manager){
-        if(!it.valid && !it.cached){
+        if(!it.valid && !it.cached ){
             pos=it.pos_index;
             return false;
         }
@@ -1012,6 +1024,7 @@ void LargeVolumeRenderer::setupControl() {
         }
     };
 }
+
 
 
 
