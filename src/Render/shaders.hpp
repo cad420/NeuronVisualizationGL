@@ -1,6 +1,33 @@
 #pragma once
 
 namespace shader{
+    const char* raycast_pos_v=R"(#version 430 core
+layout(location=0) in vec3 vertex_pos;
+uniform mat4 MVPMatrix;
+out vec3 world_pos;
+void main() {
+    gl_Position=MVPMatrix*(vec4(vertex_pos,1.0));
+    world_pos=vertex_pos;
+}
+)";
+
+    const char* raycast_pos_f=R"(#version 430 core
+in vec3 world_pos;
+uniform bool entry;
+uniform bool inside;
+uniform vec3 board_length;
+uniform vec3 camera_pos;
+out vec4 frag_color;
+void main() {
+    if(entry && inside){
+        frag_color=vec4(camera_pos/29581,1.0);
+    }
+    else{
+        frag_color=vec4(world_pos/29581,0.5);
+    }
+
+}
+)";
 
     const char* mix_block_raycast_v=R"(#version 430 core
 layout(location=0) in vec2 vertex_pos;
@@ -15,12 +42,16 @@ out vec4 frag_color;
 
 layout(location = 0) uniform sampler1D transfer_func;
 layout(location = 1) uniform sampler2D preInt_transfer_func;
+
 layout(location = 2) uniform sampler3D cache_volume0;
 layout(location = 3) uniform sampler3D cache_volume1;
 layout(location = 4) uniform sampler3D cache_volume2;
 layout(location = 5) uniform sampler3D cache_volume3;
 layout(location = 6) uniform sampler3D cache_volume4;
-layout(location = 7) uniform sampler3D cache_volume5;//off
+
+
+layout(binding=0, rgba32f) uniform image2D entry_pos;
+layout(binding=1, rgba32f) uniform image2D exit_pos;
 
 uniform float ka;
 uniform float kd;
@@ -32,6 +63,8 @@ uniform int block_length;
 uniform int padding;
 uniform ivec3 block_dim;
 uniform ivec3 texture_size3;//size3 for cache_volume
+uniform vec3 board_length;
+
 
 uniform uint lod_mapping_table_offset[10];
 uniform uint min_lod;
@@ -52,21 +85,23 @@ uniform float view_right_space;
 uniform float view_up_space;
 uniform float step;
 
-
-
 int virtualSample(int lod_t,vec3 samplePos,out vec4 scalar);
 
 vec3 phongShading(int lod_t,vec3 samplePos,vec3 diffuseColor);
+
+int sampleDefaultRaw(int lod_t,vec3 samplePos,out vec4 scalar);
+
 uint cur_lod;
+
 void main()
 {
-    int x_pos=int(gl_FragCoord.x)-int(window_width)/2;
-    int y_pos=int(gl_FragCoord.y)-int(window_height)/2;
-    vec3 ray_start_pos=view_pos+x_pos*view_right*view_right_space+y_pos*view_up*view_up_space;
-    vec3 ray_stop_pos=ray_start_pos+view_direction*view_depth;
-    ray_start_pos=camera_pos;
-    int steps=int(view_depth/step);
-    vec3 ray_direction=normalize(ray_stop_pos-camera_pos);
+    vec3 start_pos=imageLoad(entry_pos,ivec2(gl_FragCoord.xy)).xyz*29581;
+    vec3 end_pos=imageLoad(exit_pos,ivec2(gl_FragCoord.xy)).xyz*29581;
+
+    vec3 ray_start_pos=start_pos;
+    vec3 ray_direction=normalize(end_pos-start_pos);
+    int steps=int(dot(end_pos-start_pos,ray_direction));
+
 
     vec4 color=vec4(0.f);
     vec4 last_sample_scalar=vec4(0.f);
@@ -78,12 +113,13 @@ void main()
     cur_lod=min_lod;
     int lod_t=int(pow(2,cur_lod));
     float lod_step=lod_t*step;
-    for(int i=0;i<steps;i++){
+    for(int i=0;i<3000;i++){
         int return_flag=virtualSample(lod_t,sample_pos,sample_scalar);
 
+
         if(return_flag==-1){
-            color=vec4(1.f,0.f,0.f,1.f);
-            break;
+//            color=vec4(1.f,0.f,0.f,1.f);
+//            break;
         }
         else if(return_flag==-2){
             color=vec4(1.f,1.f,0.f,1.f);
@@ -100,22 +136,22 @@ void main()
 //            }
             cur_lod+=1;
             if(cur_lod>max_lod){
-                color=vec4(0.f,1.f,0.f,1.f);
+//                color=vec4(0.f,1.f,0.f,1.f);
                 break;
             }
             lod_t*=2;
             lod_step=lod_t*step;
-//            lod_steps=i;
-//            lod_sample_pos=sample_pos;
-//            i--;
-//            continue;
+            lod_steps=i;
+            lod_sample_pos=sample_pos;
+            i--;
+            continue;
 
         }
         else if(return_flag==1){
-            if(cur_lod==1){
-                color=vec4(0.f,1.f,1.f,1.f);
-                break;
-            }
+//            if(cur_lod==3){
+//                color=vec4(0.f,1.f,1.f,1.f);
+//                break;
+//            }
 //            color=vec4(0.f,0.f,1.f,1.f);
 //            if(sample_scalar.r>0.3f)
 //                color=vec4(sample_scalar.rgb,1.f);
@@ -125,14 +161,17 @@ void main()
 
         }
         else if(return_flag==2){
+//            discard;
+
             color=vec4(0.f,0.f,1.f,1.f);
             break;
         }
 
+
         if(sample_scalar.r>0.3f){
 
             sample_color=texture(preInt_transfer_func,vec2(last_sample_scalar.r,sample_scalar.r));
-//            sample_color.rgb=phongShading(lod_t,sample_pos,sample_color.rgb);
+            sample_color.rgb=phongShading(lod_t,sample_pos,sample_color.rgb);
 //            sample_color.a*=(lod_step*lod_step-i*i)*1.f/(lod_step*lod_step);
             color=color+sample_color*vec4(sample_color.aaa,1.f)*(1.f-color.a);
 
@@ -141,16 +180,14 @@ void main()
             last_sample_scalar=sample_scalar;
 
         }
-        //todo ??? lod_sample_pos
-//        sample_pos=ray_start_pos+i*ray_direction*lod_step;
-//        sample_pos=lod_sample_pos+(i-lod_steps)*ray_direction*lod_step;
-        sample_pos+=lod_step*ray_direction;
+        sample_pos=lod_sample_pos+(i-lod_steps)*ray_direction*lod_step;
     }
     if(color.a==0.f) discard;
     color+=bg_color*(1.f-color.a);
 
     frag_color=color;
 }
+
 // samplePos is raw world pos, measure in dim(raw_x,raw_y,raw_z)
 int virtualSample(int lod_t,vec3 samplePos,out vec4 scalar)
 {
@@ -158,22 +195,29 @@ int virtualSample(int lod_t,vec3 samplePos,out vec4 scalar)
     int lod_no_padding_block_length=(block_length-2*padding)*lod_t;
     ivec3 virtual_block_idx=ivec3(samplePos/lod_no_padding_block_length);
     ivec3 lod_block_dim=(block_dim+lod_t-1)/lod_t;
+
     if(samplePos.x<0.f || virtual_block_idx.x>=lod_block_dim.x
     || samplePos.y<0.f || virtual_block_idx.y>=lod_block_dim.y
-    || samplePos.z<0.f || virtual_block_idx.z>=lod_block_dim.z){
+    || samplePos.z<0.f || virtual_block_idx.z>=lod_block_dim.z
+    ){
         //shader meagings view-space intersect with volume, should return true to keep raycasting
-        scalar=vec4(0.6f);
+//        scalar=vec4(0.0f);
         return -1;//no need to continue
     }
+
     //2. get samplePos's offset in the block
-    vec3 offset_in_no_padding_block=samplePos-virtual_block_idx*lod_no_padding_block_length;
+    vec3 offset_in_no_padding_block=(samplePos-virtual_block_idx*lod_no_padding_block_length)/lod_t;
     //3. get block-dim in texture
     int flat_virtual_block_idx=virtual_block_idx.z*lod_block_dim.y*lod_block_dim.x
     +virtual_block_idx.y*lod_block_dim.x+virtual_block_idx.x+int(lod_mapping_table_offset[cur_lod]);
+
     uvec4 physical_block_idx=mapping_table.page_entry[flat_virtual_block_idx];
+
     //valid block cached in texture
     uint physical_block_flag=((physical_block_idx.w>>16)&uint(0x0000ffff));
-     if(physical_block_flag==0){//not need
+
+    if(physical_block_flag==0){//not need
+
         scalar=vec4(0.f);
         return 0;
     }
@@ -192,12 +236,12 @@ int virtualSample(int lod_t,vec3 samplePos,out vec4 scalar)
         else if(texture_id==2){
             scalar=texture(cache_volume2,pyhsical_sampel_pos);
         }
-//        else if(texture_id==3){
-//            scalar=texture(cache_volume3,pyhsical_sampel_pos);
-//        }
-//        else if(texture_id==4){
-//            scalar=texture(cache_volume4,pyhsical_sampel_pos);
-//        }
+        else if(texture_id==3){
+            scalar=texture(cache_volume3,pyhsical_sampel_pos);
+        }
+        else if(texture_id==4){
+            scalar=texture(cache_volume4,pyhsical_sampel_pos);
+        }
         else{
             scalar=vec4(0.6f);
             return -3;//error texture id
@@ -228,7 +272,7 @@ vec3 phongShading(int lod_t,vec3 samplePos,vec3 diffuseColor)
         for(int j=-1;j<2;j++){//y
             for(int i=-1;i<2;i++){//x
                 vec4 scalar;
-                virtualSample(lod_t,samplePos+vec3(i,j,k),scalar);
+                virtualSample(lod_t,samplePos+vec3(i*lod_t,j*lod_t,k*lod_t),scalar);
                 value[(k+1)*9+(j+1)*3+i+1]=scalar.r;
             }
         }

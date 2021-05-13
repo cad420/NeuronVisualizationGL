@@ -1,10 +1,10 @@
 
 include(${PROJECT_SOURCE_DIR}/cmake/utils.cmake)
-#embed_shaders(
-#        CONFIG_FILE ${CMAKE_CURRENT_SOURCE_DIR}/Render/shaders.hpp.in
-#        TARGET ${CMAKE_CURRENT_SOURCE_DIR}/Render/shaders.hpp
-#        DIR ${CMAKE_CURRENT_SOURCE_DIR}/Render/shaders
-#)
+embed_shaders(
+        CONFIG_FILE ${CMAKE_CURRENT_SOURCE_DIR}/Render/shaders.hpp.in
+        TARGET ${CMAKE_CURRENT_SOURCE_DIR}/Render/shaders.hpp
+        DIR ${CMAKE_CURRENT_SOURCE_DIR}/Render/shaders
+)
 include(${PROJECT_SOURCE_DIR}/third_party/spdlog.cmake)
 include(${PROJECT_SOURCE_DIR}/third_party/glfw.cmake)
 include(${PROJECT_SOURCE_DIR}/third_party/glm.cmake)

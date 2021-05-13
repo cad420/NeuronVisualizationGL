@@ -7,6 +7,7 @@
 #include <Data/transfer_function.hpp>
 #include <Common/help_gl.hpp>
 #include <cudaGL.h>
+#include <Render/shaders.hpp>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -860,10 +861,10 @@ void LargeVolumeRenderer::createGLSampler() {
 }
 
 void LargeVolumeRenderer::createGLShader() {
-    raycast_pos_shader=std::make_unique<sv::Shader>("C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\raycast_pos_v.glsl",
-                                                    "C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\raycast_pos_f.glsl");
-    raycasting_shader=std::make_unique<sv::Shader>("C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\mix_block_raycast_v.glsl",
-                                                   "C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\mix_block_raycast_f.glsl");
+    raycast_pos_shader=std::make_unique<sv::Shader>();
+    raycast_pos_shader->setShader(shader::raycast_pos_v,shader::raycast_pos_f);
+    raycasting_shader=std::make_unique<sv::Shader>();
+    raycasting_shader->setShader(shader::mix_block_raycast_v,shader::mix_block_raycast_f);
 }
 
 void LargeVolumeRenderer::deleteResource() {
