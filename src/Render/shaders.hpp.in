@@ -1,6 +1,9 @@
 #pragma once
 
 namespace shader{
+    const char* raycast_pos_v=R"(@raycast_pos_v.glsl@)";
+
+    const char* raycast_pos_f=R"(@raycast_pos_f.glsl@)";
 
     const char* mix_block_raycast_v=R"(@mix_block_raycast_v.glsl@)";
 
