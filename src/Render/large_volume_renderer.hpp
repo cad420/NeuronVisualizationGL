@@ -13,17 +13,23 @@
 #include <Common/camera.hpp>
 #include <unordered_set>
 #include <map>
+
 struct Myhash{
     std::size_t operator()(const sv::AABB& aabb) const {
         return (aabb.index[3]<<24)+(aabb.index[0]<<16)+(aabb.index[1]<<8)+aabb.index[2];
     }
 };
+
 class BlockReqInfo;
+
 class LargeVolumeManager;
+
 class LargeVolumeRenderer final{
 public:
     LargeVolumeRenderer(int w=1200,int h=900);
+
     ~LargeVolumeRenderer();
+
     void set_volume(const char* volume_file);
 
     void set_transferfunc(std::map<uint8_t,std::array<double,4>>);
@@ -107,27 +113,24 @@ private:
     int total_available_mem;
     int current_available_mem;
 
-
     uint32_t vol_tex_block_nx,vol_tex_block_ny,vol_tex_block_nz;
     uint32_t vol_tex_num;//equal to volume texture num
     std::vector<GLuint> volume_texes;
     std::list<BlockTableItem> volume_tex_manager;
-
 
     GLuint mapping_table_ssbo;
     std::vector<uint32_t> mapping_table;
     std::vector<uint32_t> lod_mapping_table_offset;
 
     std::unordered_map<int,std::vector<sv::AABB>> virtual_blocks;//lod1's block_length/lod0's block_length=2
-//    GLuint box_vao,box_vbo,box_ebo;
 
     std::unordered_set<sv::AABB,Myhash> current_blocks;
     std::unordered_set<sv::AABB,Myhash> new_need_blocks,no_need_blocks;
 
     int no_need_block_num,new_need_block_num;
+
     //some value for debug and imgui
     int aabb_intersect_num,obb_intersect_num,pyramid_intersect_num,refined_intersect_num,preload_pyramid_intersect_num;
-
 
     std::vector<CUgraphicsResource> cu_resources;
     CUcontext cu_context;
@@ -153,7 +156,6 @@ private:
     GLuint volume_vao;
     GLuint volume_vbo,volume_ebo;
     std::array<float,3> volume_board;
-
 
     std::unique_ptr<sv::RayCastCamera> camera;
 

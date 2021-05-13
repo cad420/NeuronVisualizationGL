@@ -7,7 +7,6 @@
 #include <Data/transfer_function.hpp>
 #include <Common/help_gl.hpp>
 #include <cudaGL.h>
-#include <omp.h>
 
 #include <imgui.h>
 #include <imgui_impl_glfw.h>
@@ -22,16 +21,19 @@ LargeVolumeRenderer::LargeVolumeRenderer(int w,int h)
     initResourceContext();
 
 }
+
 LargeVolumeRenderer::~LargeVolumeRenderer() {
     volume_manager.reset(nullptr);
     deleteResource();
 }
+
 void LargeVolumeRenderer::set_volume(const char *volume_file) {
     this->volume_manager=std::make_unique<LargeVolumeManager>(volume_file);
     setupVolumeInfo();
     setupSystemInfo();
     createResource();
 }
+
 #define B_TF_TEX_BINDING 0
 #define B_PTF_TEX_BINDING 1
 #define B_POS_ENTRY_BINDING 2
@@ -51,14 +53,14 @@ void LargeVolumeRenderer::bindGLTextureUnit() {
     GL_EXPR(glBindTextureUnit(B_VOL_TEX_1_BINDING,volume_texes[1]));
     GL_EXPR(glBindTextureUnit(B_VOL_TEX_2_BINDING,volume_texes[2]));
     GL_EXPR(glBindTextureUnit(B_VOL_TEX_3_BINDING,volume_texes[3]));
-//    GL_EXPR(glBindTextureUnit(B_VOL_TEX_4_BINDING,volume_texes[4]));
+    GL_EXPR(glBindTextureUnit(B_VOL_TEX_4_BINDING,volume_texes[4]));
 
 
     glBindSampler(B_VOL_TEX_0_BINDING,gl_sampler);
     glBindSampler(B_VOL_TEX_1_BINDING,gl_sampler);
     glBindSampler(B_VOL_TEX_2_BINDING,gl_sampler);
     glBindSampler(B_VOL_TEX_3_BINDING,gl_sampler);
-//    glBindSampler(B_VOL_TEX_4_BINDING,gl_sampler);
+    glBindSampler(B_VOL_TEX_4_BINDING,gl_sampler);
 
     GL_CHECK
 }
@@ -80,7 +82,7 @@ void LargeVolumeRenderer::setupShaderUniform() {
     raycasting_shader->setInt("cache_volume1",B_VOL_TEX_1_BINDING);
     raycasting_shader->setInt("cache_volume2",B_VOL_TEX_2_BINDING);
     raycasting_shader->setInt("cache_volume3",B_VOL_TEX_3_BINDING);
-//    raycasting_shader->setInt("cache_volume4",B_VOL_TEX_4_BINDING);
+    raycasting_shader->setInt("cache_volume4",B_VOL_TEX_4_BINDING);
 
     raycasting_shader->setVec4("bg_color",0.f,0.f,0.f,0.f);
     raycasting_shader->setInt("block_length",block_length);
@@ -147,9 +149,11 @@ void LargeVolumeRenderer::render() {
 
             BlockDesc block;
             while(volume_manager->getBlock(block)){
-                //if block not in current_blocks ?
+
                 if(isValidBlock(block.block_index)){
+
                     copyDeviceToTexture(block.data_ptr,block.block_index);
+
                 }
 
                 volume_manager->updateCUMemPool(block.data_ptr);
@@ -240,9 +244,11 @@ void LargeVolumeRenderer::render() {
         }
 
         glfwSwapBuffers(window);
+
         while(glfwGetTime()<last_frame_t+1.0/15){
 
         }
+
     }
 }
 
@@ -279,6 +285,7 @@ void LargeVolumeRenderer::createVirtualBoxes() {
         }
     }
 }
+
 void LargeVolumeRenderer::createVolumeBoard() {
     float board_x=lod_block_dim[min_lod][0]*no_padding_block_length;
     float board_y=lod_block_dim[min_lod][1]*no_padding_block_length;
@@ -329,7 +336,6 @@ void LargeVolumeRenderer::createGLTexture() {
     GL_CHECK
 }
 
-
 void LargeVolumeRenderer::createVolumeTexManager() {
     spdlog::info("{0}",__FUNCTION__ );
     assert(vol_tex_num == volume_texes.size());
@@ -349,7 +355,6 @@ void LargeVolumeRenderer::createVolumeTexManager() {
     }
 }
 
-
 void LargeVolumeRenderer::refineCurrentIntersectBlocks(std::unordered_set<sv::AABB, Myhash> &blocks) {
 //    static int lod_map_table[]={0,0,1,2,3,4,5,6,6,6,6,6};
     std::unordered_set<sv::AABB, Myhash> refined_blocks;
@@ -358,7 +363,7 @@ void LargeVolumeRenderer::refineCurrentIntersectBlocks(std::unordered_set<sv::AA
         auto view_pos=camera->camera_pos;
         float dist=glm::length(block_pos-view_pos);
 //        uint32_t dist_lod=dist/no_padding_block_length+min_lod;
-        uint32_t dist_lod=std::log2(dist/no_padding_block_length+1)+min_lod;
+        uint32_t dist_lod=std::sqrt(dist/no_padding_block_length)+min_lod;
         dist_lod=dist_lod>max_lod?max_lod:dist_lod;
         assert(block.index[3]==min_lod);
         int t=std::pow(2,dist_lod-min_lod);
@@ -446,25 +451,8 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid& view_pyramid) {
     }
     no_need_block_num=no_need_blocks.size();
 
-//    std::cout<<"total no need block num: "<<no_need_block_num<<"\tlod no need block num: "<<lod_no_need_blocks.size()<<"\tnew need block num: "<<new_need_block_num<<std::endl;
 
-//    std::cout<<"new size: "<<new_need_blocks.size()<<std::endl;
-//    std::cout<<"no size: "<<no_need_blocks.size()<<std::endl;
     current_blocks=std::move(current_pyramid_intersect_blocks);
-
-//    for(auto&it :no_need_blocks){
-//        uint32_t flat_idx=(it.index[2]*lod_block_dim[it.index[3]][0]*lod_block_dim[it.index[3]][1]+it.index[1]*lod_block_dim[it.index[3]][0]+it.index[0])*4+lod_mapping_table_offset[it.index[3]];
-//        mapping_table[flat_idx+3]&=0x0000ffff;
-////        std::cout<<"update no need block: ";
-////        print_array(it.index);
-//    }
-//    for(auto& it:new_need_blocks){
-//        uint32_t flat_idx=(it.index[2]*lod_block_dim[it.index[3]][0]*lod_block_dim[it.index[3]][1]+it.index[1]*lod_block_dim[it.index[3]][0]+it.index[0])*4+lod_mapping_table_offset[it.index[3]];
-//        mapping_table[flat_idx+3]&=0x0000ffff;//first clear then assign
-//        mapping_table[flat_idx+3]|=0x00020000;//loading...
-////        std::cout<<"update new need blocks: ";
-////        print_array(it.index);
-//    }
 
     for(auto& it:volume_tex_manager){
         auto t=sv::AABB(it.block_index);
@@ -481,6 +469,7 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid& view_pyramid) {
 
     return true;
 }
+
 auto LargeVolumeRenderer::getBlockRequestInfo() -> BlockReqInfo {
     BlockReqInfo request;
     for(auto& it:new_need_blocks){
@@ -524,7 +513,6 @@ bool LargeVolumeRenderer::isValidBlock(std::array<uint32_t,4> idx) {
     return false;
 }
 
-
 void LargeVolumeRenderer::copyDeviceToTexture(CUdeviceptr ptr, std::array<uint32_t, 4> idx) {
     spdlog::info("{0}",__FUNCTION__ );
     //inspect if idx is still in current_blocks
@@ -547,12 +535,9 @@ void LargeVolumeRenderer::copyDeviceToTexture(CUdeviceptr ptr, std::array<uint32
 
         CUDA_DRIVER_API_CALL(cuGraphicsSubResourceGetMappedArray(&cu_array,cu_resources[tex_pos_index[3]],0,0));
 
-
-
         CUDA_MEMCPY3D m = { 0 };
         m.srcMemoryType=CU_MEMORYTYPE_DEVICE;
         m.srcDevice=ptr;
-
 
         m.dstMemoryType=CU_MEMORYTYPE_ARRAY;
         m.dstArray=cu_array;
@@ -598,16 +583,13 @@ void LargeVolumeRenderer::copyDeviceToTexture(CUdeviceptr ptr, std::array<uint32
 //    print_array(idx);
 //    std::cout<<"offset: "<<flat_idx/4<<std::endl;
 }
+
 bool LargeVolumeRenderer::getTexturePos(const std::array<uint32_t, 4> &idx, std::array<uint32_t, 4> &pos) {
     for(auto&it :volume_tex_manager){
         if(it.block_index==idx && it.cached && !it.valid){
             pos=it.pos_index;
             return true;
         }
-//        else if(it.block_index==idx && !it.cached && !it.valid){
-//            pos=it.pos_index;
-//            return false;
-//        }
     }
     for(auto& it:volume_tex_manager){
         if(!it.valid && !it.cached ){
@@ -624,10 +606,6 @@ bool LargeVolumeRenderer::getTexturePos(const std::array<uint32_t, 4> &idx, std:
     spdlog::critical("not find empty texture pos");
     throw std::runtime_error("not find empty texture pos");
 }
-
-
-
-
 
 void LargeVolumeRenderer::uploadMappingTable() {
     GL_EXPR(glNamedBufferSubData(mapping_table_ssbo,0,mapping_table.size()*sizeof(uint32_t),mapping_table.data()));
@@ -661,7 +639,7 @@ void LargeVolumeRenderer::setupSystemInfo() {
     vol_tex_block_nx=4;
     vol_tex_block_ny=2;
     vol_tex_block_nz=2;
-    vol_tex_num=4;
+    vol_tex_num=5;
     uint64_t single_texture_size=((uint64_t)vol_tex_block_nx*vol_tex_block_ny*vol_tex_block_nz*block_length*block_length*block_length)/1024;
     std::cout<<"single_texture_size: "<<single_texture_size<<std::endl;
     if(single_texture_size*vol_tex_num>current_available_mem){
@@ -757,6 +735,7 @@ void LargeVolumeRenderer::createGLResource() {
 void LargeVolumeRenderer::createCUDAResource() {
     createCUgraphics();
 }
+
 void LargeVolumeRenderer::createCUgraphics() {
     spdlog::info("{0}",__FUNCTION__ );
     assert(vol_tex_num == volume_texes.size() && vol_tex_num != 0);
@@ -772,6 +751,7 @@ void LargeVolumeRenderer::createUtilResource() {
     createVirtualBoxes();
 
 }
+
 void LargeVolumeRenderer::createScreenQuad() {
     spdlog::info("{0}",__FUNCTION__ );
     screen_quad_vertices={
@@ -831,8 +811,6 @@ void LargeVolumeRenderer::createPosFrameBuffer() {
     GL_CHECK
 }
 
-
-
 void LargeVolumeRenderer::set_transferfunc(std::map<uint8_t, std::array<double, 4>> color_setting) {
     sv::TransferFunc tf(color_setting);
     glGenTextures(1,&transfer_func_tex);
@@ -867,6 +845,7 @@ void LargeVolumeRenderer::set_camera(std::tuple<std::array<float, 3> , std::arra
     glm::vec3 camera_up={up[0],up[1],up[2]};
     this->camera=std::make_unique<sv::RayCastCamera>(camera_pos,camera_front,camera_up,zoom,n,f,window_width/2,window_height/2);
 }
+
 void LargeVolumeRenderer::createGLSampler() {
     spdlog::info("{0}",__FUNCTION__ );
     GL_EXPR(glCreateSamplers(1,&gl_sampler));
@@ -886,6 +865,7 @@ void LargeVolumeRenderer::createGLShader() {
     raycasting_shader=std::make_unique<sv::Shader>("C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\mix_block_raycast_v.glsl",
                                                    "C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\mix_block_raycast_f.glsl");
 }
+
 void LargeVolumeRenderer::deleteResource() {
     deleteCUDAResource();
     deleteGLResource();
@@ -989,6 +969,9 @@ void LargeVolumeRenderer::setupControl() {
 //            this->should_redraw=true;
             camera->processKeyForArg(sv::CameraDefinedKey::MOVE_FASTER);
         }
+        else if(key==GLFW_KEY_G && action==GLFW_PRESS){
+            camera->processKeyForArg(sv::CameraDefinedKey::MOVE_SLOWER);
+        }
 
     };
     glfwSetFramebufferSizeCallback(window,glfw_framebuffer_resize_callback);
@@ -1024,22 +1007,3 @@ void LargeVolumeRenderer::setupControl() {
         }
     };
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

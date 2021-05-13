@@ -133,7 +133,7 @@ void LargeVolumeManager::initCUResource() {
 
     assert(block_length);
     uint64_t block_byte_size=(uint64_t)block_length*block_length*block_length;
-    int cu_mem_size=WORKER_NUM*2;
+    int cu_mem_size=8;
     cu_mem_pool=std::make_unique<CUMemPool>();
     cu_mem_pool->setBlockSizeBytes(block_byte_size);
     for(int i=0;i<cu_mem_size;i++){

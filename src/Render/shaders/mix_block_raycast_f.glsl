@@ -9,8 +9,8 @@ layout(location = 3) uniform sampler3D cache_volume1;
 layout(location = 4) uniform sampler3D cache_volume2;
 layout(location = 5) uniform sampler3D cache_volume3;
 layout(location = 6) uniform sampler3D cache_volume4;
-layout(location = 7) uniform sampler3D cache_volume5;//off
-//layout(binding=0, rgba32f) uniform image2D last_frame;
+
+
 layout(binding=0, rgba32f) uniform image2D entry_pos;
 layout(binding=1, rgba32f) uniform image2D exit_pos;
 
@@ -46,31 +46,18 @@ uniform float view_right_space;
 uniform float view_up_space;
 uniform float step;
 
-
-
 int virtualSample(int lod_t,vec3 samplePos,out vec4 scalar);
 
 vec3 phongShading(int lod_t,vec3 samplePos,vec3 diffuseColor);
 
 int sampleDefaultRaw(int lod_t,vec3 samplePos,out vec4 scalar);
-uint cur_lod;
 
+uint cur_lod;
 
 void main()
 {
     vec3 start_pos=imageLoad(entry_pos,ivec2(gl_FragCoord.xy)).xyz*29581;
     vec3 end_pos=imageLoad(exit_pos,ivec2(gl_FragCoord.xy)).xyz*29581;
-
-
-
-
-//    int x_pos=int(gl_FragCoord.x)-int(window_width)/2;
-//    int y_pos=int(gl_FragCoord.y)-int(window_height)/2;
-//    vec3 ray_start_pos=view_pos+x_pos*view_right*view_right_space+y_pos*view_up*view_up_space;
-//    vec3 ray_stop_pos=ray_start_pos+view_direction*view_depth;
-//    ray_start_pos=camera_pos;
-//    int steps=int(view_depth/step);
-//    vec3 ray_direction=normalize(ray_stop_pos-camera_pos);
 
     vec3 ray_start_pos=start_pos;
     vec3 ray_direction=normalize(end_pos-start_pos);
@@ -154,10 +141,7 @@ void main()
             last_sample_scalar=sample_scalar;
 
         }
-        //todo ??? lod_sample_pos
-//        sample_pos=ray_start_pos+i*ray_direction*lod_step;
         sample_pos=lod_sample_pos+(i-lod_steps)*ray_direction*lod_step;
-//        sample_pos+=lod_step*ray_direction;
     }
     if(color.a==0.f) discard;
     color+=bg_color*(1.f-color.a);
@@ -172,9 +156,7 @@ int virtualSample(int lod_t,vec3 samplePos,out vec4 scalar)
     int lod_no_padding_block_length=(block_length-2*padding)*lod_t;
     ivec3 virtual_block_idx=ivec3(samplePos/lod_no_padding_block_length);
     ivec3 lod_block_dim=(block_dim+lod_t-1)/lod_t;
-//    if(virtual_block_idx.x>=lod_block_dim.x || virtual_block_idx.y>=lod_block_dim.y || virtual_block_idx.z>=lod_block_dim.z){
-//        return -11;
-//    }
+
     if(samplePos.x<0.f || virtual_block_idx.x>=lod_block_dim.x
     || samplePos.y<0.f || virtual_block_idx.y>=lod_block_dim.y
     || samplePos.z<0.f || virtual_block_idx.z>=lod_block_dim.z
@@ -194,10 +176,7 @@ int virtualSample(int lod_t,vec3 samplePos,out vec4 scalar)
 
     //valid block cached in texture
     uint physical_block_flag=((physical_block_idx.w>>16)&uint(0x0000ffff));
-//    if(flat_virtual_block_idx==61289 && virtual_block_idx.x==8 && virtual_block_idx.y==7 && virtual_block_idx.z==4){
-//
-//        return 6;
-//    }
+
     if(physical_block_flag==0){//not need
 
         scalar=vec4(0.f);
