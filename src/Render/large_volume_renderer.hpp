@@ -61,6 +61,7 @@ private:
     void createGLSampler();
     void createGLShader();
     void createPosFrameBuffer();
+    void createGuideMap();
 
     //createCUDAResource
     void createCUgraphics();
@@ -101,6 +102,7 @@ private:
     bool getTexturePos(const std::array<uint32_t,4>&,std::array<uint32_t,4>&);
     void copyDeviceToTexture(CUdeviceptr,std::array<uint32_t,4>);
     void updateCameraUniform();
+    void renderGuideMap();
 private:
 
     uint32_t block_length,padding,no_padding_block_length;
@@ -161,6 +163,10 @@ private:
 
     std::unique_ptr<sv::Shader> raycasting_shader;
     std::unique_ptr<sv::Shader> raycast_pos_shader;
+    std::unique_ptr<sv::Shader> guide_map_shader;
+
+    GLuint map_vao,map_vbo;
+    std::array<glm::vec3,46> map_vertex;
 
 };
 #endif //NEURONVISUALIZATIONGL_LARGE_VOLUME_RENDERER_H

@@ -133,6 +133,8 @@ void LargeVolumeRenderer::render() {
         double delta_t=current_frame_t-last_frame_t;
         last_frame_t=current_frame_t;
 
+        GL_CHECK
+
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 
@@ -162,9 +164,16 @@ void LargeVolumeRenderer::render() {
             }
         }
 
+        GL_CHECK
+
         uploadMappingTable();
 
+        GL_CHECK
+
         updateCameraUniform();
+
+
+        GL_CHECK
 
         bool is_inside=false;
         //render volume
@@ -185,6 +194,7 @@ void LargeVolumeRenderer::render() {
 
                 is_inside=true;
             }
+            GL_CHECK
             raycast_pos_shader->setBool("inside",is_inside);
             glBindFramebuffer(GL_FRAMEBUFFER,raycast_pos_fbo);
             glBindVertexArray(volume_vao);
@@ -193,6 +203,8 @@ void LargeVolumeRenderer::render() {
             glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
             raycast_pos_shader->setBool("entry",true);
             glDrawElements(GL_TRIANGLES,36,GL_UNSIGNED_INT,0);
+
+            GL_CHECK
 
             glEnable(GL_CULL_FACE);
             glFrontFace(GL_CCW);
@@ -205,11 +217,23 @@ void LargeVolumeRenderer::render() {
 
             glBindFramebuffer(GL_FRAMEBUFFER,0);
 
+            GL_CHECK
+
             raycasting_shader->use();
 
             glBindVertexArray(screen_quad_vao);
 
             glDrawArrays(GL_TRIANGLES,0,6);
+
+            GL_CHECK
+
+//            {
+//                glViewport(0, 0, 300, 200);
+//                glDisable(GL_DEPTH_TEST);
+//                renderGuideMap();
+//                glEnable(GL_DEPTH_TEST);
+//                glViewport(0, 0, window_width, window_height);
+//            }
             GL_CHECK
         }
 
@@ -253,6 +277,8 @@ void LargeVolumeRenderer::render() {
 }
 
 void LargeVolumeRenderer::updateCameraUniform() {
+    GL_CHECK
+    raycasting_shader->use();
     raycasting_shader->setVec3("camera_pos",camera->camera_pos);
     raycasting_shader->setVec3("view_pos",camera->camera_pos+camera->n*camera->view_direction);
     raycasting_shader->setVec3("view_direction",camera->view_direction);
@@ -262,6 +288,7 @@ void LargeVolumeRenderer::updateCameraUniform() {
     raycasting_shader->setFloat("view_right_space",camera->space_x);
     raycasting_shader->setFloat("view_up_space",camera->space_y);
     raycasting_shader->setFloat("step",camera->space_z);
+    GL_CHECK
 }
 
 void LargeVolumeRenderer::createVirtualBoxes() {
@@ -362,8 +389,17 @@ void LargeVolumeRenderer::refineCurrentIntersectBlocks(std::unordered_set<sv::AA
         auto block_pos=(block.max_p+block.min_p)/2.f;
         auto view_pos=camera->camera_pos;
         float dist=glm::length(block_pos-view_pos);
-//        uint32_t dist_lod=dist/no_padding_block_length+min_lod;
-        uint32_t dist_lod=std::sqrt(dist/no_padding_block_length)+min_lod;
+        uint32_t dist_lod;
+//        if(camera->camera_pos.x<volume_board[0] && camera->camera_pos.y<volume_board[1] && camera->camera_pos.z<volume_board[2]
+//           && camera->camera_pos.x>0.f && camera->camera_pos.y>0.f && camera->camera_pos.z>0.f){
+//            //inside
+//            dist_lod=std::sqrt(dist/no_padding_block_length)+min_lod;
+//        }
+//        else{
+//            dist_lod=dist/no_padding_block_length+min_lod;
+//        }
+        dist_lod=(dist-no_padding_block_length)/no_padding_block_length+min_lod;
+        dist_lod=dist_lod<min_lod?min_lod:dist_lod;
         dist_lod=dist_lod>max_lod?max_lod:dist_lod;
         assert(block.index[3]==min_lod);
         int t=std::pow(2,dist_lod-min_lod);
@@ -730,6 +766,7 @@ void LargeVolumeRenderer::createGLResource() {
     createVolumeBoard();
     createPosFrameBuffer();
     createGLShader();
+    createGuideMap();
 }
 
 void LargeVolumeRenderer::createCUDAResource() {
@@ -864,6 +901,8 @@ void LargeVolumeRenderer::createGLShader() {
                                                     "C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\raycast_pos_f.glsl");
     raycasting_shader=std::make_unique<sv::Shader>("C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\mix_block_raycast_v.glsl",
                                                    "C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\mix_block_raycast_f.glsl");
+    guide_map_shader=std::make_unique<sv::Shader>("C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\guide_map_v.glsl",
+                                                  "C:\\Users\\wyz\\projects\\NeuronVisualizationGL\\src\\Render\\shaders\\guide_map_f.glsl");
 }
 
 void LargeVolumeRenderer::deleteResource() {
@@ -1006,4 +1045,98 @@ void LargeVolumeRenderer::setupControl() {
 
         }
     };
+}
+
+void LargeVolumeRenderer::renderGuideMap() {
+    auto view_pyramid=camera->getPyramid();
+    auto view_pos=view_pyramid.start_pos;
+    map_vertex[24]=view_pos;
+    map_vertex[25]={view_pos.x,view_pos.y,0.f};
+    map_vertex[26]=view_pos;
+    map_vertex[27]={view_pos.x,0.f,view_pos.z};
+    map_vertex[28]=view_pos;
+    map_vertex[29]={0.f,view_pos.y,view_pos.z};
+
+    map_vertex[30]=view_pos;
+    map_vertex[31]=view_pyramid.right_down_pos;
+    map_vertex[32]=view_pos;
+    map_vertex[33]=view_pyramid.right_up_pos;
+    map_vertex[34]=view_pos;
+    map_vertex[35]=view_pyramid.left_down_pos;
+    map_vertex[36]=view_pos;
+    map_vertex[37]=view_pyramid.left_up_pos;
+
+    map_vertex[38]=view_pyramid.left_up_pos;
+    map_vertex[39]=view_pyramid.right_up_pos;
+
+    map_vertex[40]=view_pyramid.right_up_pos;
+    map_vertex[41]=view_pyramid.right_down_pos;
+
+    map_vertex[42]=view_pyramid.right_down_pos;
+    map_vertex[43]=view_pyramid.left_down_pos;
+
+    map_vertex[44]=view_pyramid.left_down_pos;
+    map_vertex[45]=view_pyramid.left_up_pos;
+
+    GL_EXPR(glBindBuffer(GL_ARRAY_BUFFER,map_vbo));
+    GL_EXPR(glNamedBufferSubData(map_vbo,0,sizeof(map_vertex),map_vertex.data()));
+
+    guide_map_shader->use();
+    glm::mat4 view=glm::lookAt(glm::vec3{40000.f,40000.f,20000.f},glm::vec3{0.f,0.f,0.f},glm::vec3{0.f,1.f,0.f});
+    glm::mat4 projection=glm::perspective(glm::radians(60.f),1920.f/1080,10.f,60000.f);
+    auto mvp=projection*view;
+    guide_map_shader->setMat4("MVPMatrix",mvp);
+    GL_EXPR(glBindVertexArray(map_vao));
+    GL_EXPR(glDrawArrays(GL_LINES,0,46));
+
+}
+
+void LargeVolumeRenderer::createGuideMap() {
+    glGenVertexArrays(1,&map_vao);
+    glBindVertexArray(map_vao);
+    glGenBuffers(1,&map_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER,map_vbo);
+    //cube has 12 edges, 3 verticals, pyramid has 8 edges
+    glBufferStorage(GL_ARRAY_BUFFER,sizeof(float)*(12+3+8)*2*3,nullptr,GL_DYNAMIC_STORAGE_BIT);
+//    glBufferData(GL_ARRAY_BUFFER,sizeof(float)*(12+3+8)*2*3,nullptr,GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,3*sizeof(float),(void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0);
+
+    map_vertex[0]={0.f,0.f,0.f};
+    map_vertex[1]={volume_board[0],0.f,0.f};
+
+    map_vertex[2]={volume_board[0],0.f,0.f};
+    map_vertex[3]={volume_board[0],volume_board[1],0.f};
+
+    map_vertex[4]={volume_board[0],volume_board[1],0.f};
+    map_vertex[5]={0.f,volume_board[1],0.f};
+
+    map_vertex[6]={0.f,volume_board[1],0.f};
+    map_vertex[7]={0.f,0.f,0.f};
+
+    map_vertex[8]={0.f,0.f,0.f};
+    map_vertex[9]={0.f,0.f,volume_board[2]};
+
+    map_vertex[10]={volume_board[0],0.f,0.f};
+    map_vertex[11]={volume_board[0],0.f,volume_board[2]};
+
+    map_vertex[12]={volume_board[0],volume_board[1],0.f};
+    map_vertex[13]={volume_board[0],volume_board[1],volume_board[2]};
+
+    map_vertex[14]={0.f,volume_board[1],0.f};
+    map_vertex[15]={0.f,volume_board[1],volume_board[2]};
+
+    map_vertex[16]={0.f,0.f,volume_board[2]};
+    map_vertex[17]={volume_board[0],0.f,volume_board[2]};
+
+    map_vertex[18]={volume_board[0],0.f,volume_board[2]};
+    map_vertex[19]={volume_board[0],volume_board[1],volume_board[2]};
+
+    map_vertex[20]={volume_board[0],volume_board[1],volume_board[2]};
+    map_vertex[21]={0.f,volume_board[1],volume_board[2]};
+
+    map_vertex[22]={0.f,volume_board[1],volume_board[2]};
+    map_vertex[23]={0.f,0.f,volume_board[2]};
+    GL_CHECK
 }

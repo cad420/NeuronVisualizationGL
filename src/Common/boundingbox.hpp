@@ -276,7 +276,8 @@ namespace sv {
         bool point_inside_pyramid(const glm::vec3& point) const;
     private:
         void calc_coefficient();
-    private:
+
+    public:
         glm::vec3 start_pos;
         glm::vec3 left_up_pos;
         glm::vec3 right_up_pos;
