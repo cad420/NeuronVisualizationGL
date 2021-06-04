@@ -9,7 +9,9 @@ LargeVolumeReader::LargeVolumeReader(const char *lod_config_file) {
     this->min_lod=lod_file.get_min_lod();
     this->max_lod=lod_file.get_max_lod();
     for(int i=min_lod;i<=max_lod;i++){
-        readers[i]=std::make_unique<sv::Reader>(lod_file.get_lod_file_path(i).c_str());
+        auto fileName = lod_file.get_lod_file_path(i);
+        auto cfileName = fileName.c_str();
+        readers[i]=std::make_unique<sv::Reader>(cfileName);
         readers[i]->read_header();
     }
     if(this->min_lod<0 || this->max_lod>10){

@@ -13,14 +13,15 @@
 #include <imgui_impl_glfw.h>
 #include <imgui_impl_opengl3.h>
 
-LargeVolumeRenderer::LargeVolumeRenderer(int w,int h)
-:window_width(w),window_height(h)
-{
-    if(w>2048 || h>2048 || w<1 || h<1){
-        throw std::runtime_error("bad width or height");
-    }
-    initResourceContext();
+#include <Window/WindowManager.hpp>
 
+LargeVolumeRenderer::LargeVolumeRenderer(int w,int h)
+:window_width(w),window_height(h), windowManager(WindowManager::Instance())
+{
+//    if(w>2048 || h>2048 || w<1 || h<1){
+//        throw std::runtime_error("bad width or height");
+//    }
+    initResourceContext();
 }
 
 LargeVolumeRenderer::~LargeVolumeRenderer() {
@@ -53,15 +54,15 @@ void LargeVolumeRenderer::bindGLTextureUnit() {
     GL_EXPR(glBindTextureUnit(B_VOL_TEX_0_BINDING,volume_texes[0]));
     GL_EXPR(glBindTextureUnit(B_VOL_TEX_1_BINDING,volume_texes[1]));
     GL_EXPR(glBindTextureUnit(B_VOL_TEX_2_BINDING,volume_texes[2]));
-    GL_EXPR(glBindTextureUnit(B_VOL_TEX_3_BINDING,volume_texes[3]));
-    GL_EXPR(glBindTextureUnit(B_VOL_TEX_4_BINDING,volume_texes[4]));
+//    GL_EXPR(glBindTextureUnit(B_VOL_TEX_3_BINDING,volume_texes[3]));
+//    GL_EXPR(glBindTextureUnit(B_VOL_TEX_4_BINDING,volume_texes[4]));
 
 
     glBindSampler(B_VOL_TEX_0_BINDING,gl_sampler);
     glBindSampler(B_VOL_TEX_1_BINDING,gl_sampler);
     glBindSampler(B_VOL_TEX_2_BINDING,gl_sampler);
     glBindSampler(B_VOL_TEX_3_BINDING,gl_sampler);
-    glBindSampler(B_VOL_TEX_4_BINDING,gl_sampler);
+//    glBindSampler(B_VOL_TEX_4_BINDING,gl_sampler);
 
     GL_CHECK
 }
@@ -83,7 +84,7 @@ void LargeVolumeRenderer::setupShaderUniform() {
     raycasting_shader->setInt("cache_volume1",B_VOL_TEX_1_BINDING);
     raycasting_shader->setInt("cache_volume2",B_VOL_TEX_2_BINDING);
     raycasting_shader->setInt("cache_volume3",B_VOL_TEX_3_BINDING);
-    raycasting_shader->setInt("cache_volume4",B_VOL_TEX_4_BINDING);
+//    raycasting_shader->setInt("cache_volume4",B_VOL_TEX_4_BINDING);
 
     raycasting_shader->setVec4("bg_color",0.f,0.f,0.f,0.f);
     raycasting_shader->setInt("block_length",block_length);
@@ -175,6 +176,17 @@ void LargeVolumeRenderer::render() {
             glm::mat4 projection=glm::perspective(glm::radians(camera->fov),
                                                   (float)window_width/(float)window_height,
                                                   1.f,50000.0f);
+            int colNum = windowManager.GetWindowColSize();
+            int rowNum = windowManager.GetWindowRowSize();
+            int col = windowManager.GetTileWindowOffsetX();
+            int row = windowManager.GetTileWindowOffsetY();
+
+            projection[0][0] *= colNum;
+            projection[1][1] *= rowNum;
+            projection[2][0] = -colNum + 1 + 2 * col;
+            projection[2][1] = rowNum - 1 - 2 * row;
+
+
             glm::mat4 mvp=projection*view;
             raycast_pos_shader->use();
             raycast_pos_shader->setMat4("MVPMatrix",mvp);
@@ -244,6 +256,7 @@ void LargeVolumeRenderer::render() {
 
         }
 
+        MPI_Barrier(MPI_COMM_WORLD);
         glfwSwapBuffers(window);
 
         while(glfwGetTime()<last_frame_t+1.0/15){
@@ -417,14 +430,14 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid& view_pyramid) {
 
     pyramid_intersect_num=current_pyramid_intersect_blocks.size();
 
-    auto preload_view_pyramid=view_pyramid;
-    preload_view_pyramid.reshape(1024.f);
-    for(auto& it:current_pyramid_intersect_blocks){
-        if(preload_view_pyramid.intersect_aabb(it)){
-            preload_pyramid_intersect_blocks.insert(it);
-        }
-    }
-    preload_pyramid_intersect_num=preload_pyramid_intersect_blocks.size();
+//    auto preload_view_pyramid=view_pyramid;
+//    preload_view_pyramid.reshape(1024.f);
+//    for(auto& it:current_pyramid_intersect_blocks){
+//        if(preload_view_pyramid.intersect_aabb(it)){
+//            preload_pyramid_intersect_blocks.insert(it);
+//        }
+//    }
+//    preload_pyramid_intersect_num=preload_pyramid_intersect_blocks.size();
 //    current_pyramid_intersect_blocks=std::move(current_aabb_intersect_blocks);
 
     refineCurrentIntersectBlocks(current_pyramid_intersect_blocks);
@@ -637,10 +650,10 @@ void LargeVolumeRenderer::setupSystemInfo() {
     GL_EXPR(glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABEL_MEMORY_NVX,&total_available_mem));
     GL_EXPR(glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABEL_VIDEMEM_NVX,&current_available_mem));
 
-    vol_tex_block_nx=4;
+    vol_tex_block_nx=2;
     vol_tex_block_ny=2;
     vol_tex_block_nz=2;
-    vol_tex_num=5;
+    vol_tex_num=3;
     uint64_t single_texture_size=((uint64_t)vol_tex_block_nx*vol_tex_block_ny*vol_tex_block_nz*block_length*block_length*block_length)/1024;
     std::cout<<"single_texture_size: "<<single_texture_size<<std::endl;
     if(single_texture_size*vol_tex_num>current_available_mem){
@@ -676,11 +689,16 @@ void LargeVolumeRenderer::initGL() {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    window = glfwCreateWindow(window_width, window_height, "Large Volume Render", NULL, NULL);
+    glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+    glfwWindowHint(GLFW_DECORATED, GL_FALSE);
+
+    window = glfwCreateWindow(windowManager.GetTileWindowWidth(), windowManager.GetTileWindowHeight(), "Large Volume Render", NULL, NULL);
     if (window == nullptr) {
         glfwTerminate();
         throw std::runtime_error("Failed to create GLFW window");
     }
+
+    glfwSetWindowPos(window, windowManager.GetWindowLocationOffsetX(), windowManager.GetWindowLocationOffsetY());
 
     glfwMakeContextCurrent(window);
 
@@ -968,10 +986,10 @@ void LargeVolumeRenderer::setupControl() {
         }
         if(key==GLFW_KEY_F && action==GLFW_PRESS){
 //            this->should_redraw=true;
-            camera->processKeyForArg(sv::CameraDefinedKey::MOVE_FASTER);
+            camera->processKeyForArg(sv::CameraOperation::MOVE_FASTER);
         }
         else if(key==GLFW_KEY_G && action==GLFW_PRESS){
-            camera->processKeyForArg(sv::CameraDefinedKey::MOVE_SLOWER);
+            camera->processKeyForArg(sv::CameraOperation::MOVE_SLOWER);
         }
 
     };
@@ -982,29 +1000,105 @@ void LargeVolumeRenderer::setupControl() {
     glfwSetKeyCallback(window,glfw_keyboard_callback);
 
     process_input=[&](GLFWwindow *window,float delta_time){
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS){
-            camera->processMovementByKey(sv::CameraMoveDirection::FORWARD, delta_time);
+//        cout << windowManager.GetWindowIndex() << " Enter!!!!!!!!!!!!!!!!!!!!!!!" << endl;
+        if(glfwGetKey(window, GLFW_KEY_ESCAPE)==GLFW_PRESS){
+            glfwSetWindowShouldClose(window, true);
+        }
+        sv::CameraOperation operation = sv::CameraOperation::NONE;
+        if(glfwGetKey(window, GLFW_KEY_F)==GLFW_PRESS){
+            operation = sv::CameraOperation::MOVE_FASTER;
+        }
+        if(glfwGetKey(window, GLFW_KEY_G)==GLFW_PRESS){
+            operation = sv::CameraOperation::MOVE_SLOWER;
+        }
 
+        if (glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS){
+            operation = sv::CameraOperation::ZOOM_UP;
+        }
+        if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS){
+            operation = sv::CameraOperation::ZOOM_DOWN;
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS){
+            operation = sv::CameraOperation::ROTATE_FASTER;
+        }
+        if (glfwGetKey(window, GLFW_KEY_V) == GLFW_PRESS){
+            operation = sv::CameraOperation::ROTATE_SLOWER;
+        }
+
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS){
+            operation = sv::CameraOperation::FORWARD;
         }
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS){
-            camera->processMovementByKey(sv::CameraMoveDirection::BACKWARD, delta_time);
-
+            operation = sv::CameraOperation::BACKWARD;
         }
         if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS){
-            camera->processMovementByKey(sv::CameraMoveDirection::LEFT, delta_time);
-
+            operation = sv::CameraOperation::LEFT;
         }
         if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS){
-            camera->processMovementByKey(sv::CameraMoveDirection::RIGHT, delta_time);
-
+            operation = sv::CameraOperation::RIGHT;
         }
         if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
-            camera->processMovementByKey(sv::CameraMoveDirection::UP, delta_time);
-
+            operation = sv::CameraOperation::UP;
         }
         if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
-            camera->processMovementByKey(sv::CameraMoveDirection::DOWN, delta_time);
-
+            operation = sv::CameraOperation::DOWN;
         }
+
+        if (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS){
+            operation = sv::CameraOperation::TURN_UP;
+        }
+        if (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS){
+            operation = sv::CameraOperation::TURN_DOWN;
+        }
+        if (glfwGetKey(window, GLFW_KEY_LEFT) == GLFW_PRESS){
+            operation = sv::CameraOperation::TURN_LEFT;
+        }
+        if (glfwGetKey(window, GLFW_KEY_RIGHT) == GLFW_PRESS){
+            operation = sv::CameraOperation::TURN_RIGHT;
+        }
+
+        static std::unique_ptr<sv::CameraOperation> operations;
+        if(windowManager.GetWindowIndex() == 0 && !operations) {
+            operations = std::unique_ptr<sv::CameraOperation>(new sv::CameraOperation[windowManager.GetWindowNum()]);
+        }
+
+        MPI_Gather(&operation, 1, MPI_INT, operations.get(), 1, MPI_INT, 0, MPI_COMM_WORLD);
+
+        if(windowManager.GetWindowIndex() == 0) {
+            for(int i = 0; i < windowManager.GetWindowNum(); i++) {
+                camera->processCameraOperation(*(operations.get() + i), delta_time);
+            }
+        }
+        MPI_Bcast(&camera->camera_pos, 26, MPI_FLOAT, 0, MPI_COMM_WORLD);
+        MPI_Bcast(&camera->is_perspective, 1, MPI_C_BOOL, 0, MPI_COMM_WORLD);
+//        cout << windowManager.GetWindowIndex() << " Exit!!!!!!!!!!!!!!!" << endl;
     };
+
+//    process_input=[&](GLFWwindow *window,float delta_time){
+//        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS){
+//            camera->processMovementByKey(sv::CameraOperation::FORWARD, delta_time);
+//
+//        }
+//        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS){
+//            camera->processMovementByKey(sv::CameraOperation::BACKWARD, delta_time);
+//
+//        }
+//        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS){
+//            camera->processMovementByKey(sv::CameraOperation::LEFT, delta_time);
+//
+//        }
+//        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS){
+//            camera->processMovementByKey(sv::CameraOperation::RIGHT, delta_time);
+//
+//        }
+//        if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS){
+//            camera->processMovementByKey(sv::CameraOperation::UP, delta_time);
+//
+//        }
+//        if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS){
+//            camera->processMovementByKey(sv::CameraOperation::DOWN, delta_time);
+//
+//        }
+//    };
 }

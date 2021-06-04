@@ -6,6 +6,8 @@
 
 #include <Render/large_volume_renderer.hpp>
 #include <Common/renderer_config.hpp>
+#include <Window/WindowManager.hpp>
+
 int NeuronVisGLApplication::run(int argc, char **argv) {
     cmdline::parser cmd;
 
@@ -14,8 +16,10 @@ int NeuronVisGLApplication::run(int argc, char **argv) {
     auto config_file=cmd.get<std::string>("config_file");
     try{
         RendererConfig renderer_config(config_file.c_str());
+        WindowManager &windowManager = WindowManager::Instance();
+        windowManager.Init(config_file);
 
-        LargeVolumeRenderer renderer(renderer_config.getWidth(),renderer_config.getHeight());
+        LargeVolumeRenderer renderer(windowManager.GetWholeWindowWidth(), windowManager.GetWholeWindowHeight());
 
         renderer.set_volume(renderer_config.getLodFile().c_str());
 

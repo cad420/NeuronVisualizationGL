@@ -4,6 +4,7 @@
 #include<spdlog/spdlog.h>
 #include<glm/glm.hpp>
 #include "NeuronVisGLApplication.hpp"
+
 int main(int argc,char** argv)
 {
     spdlog::info("Welcome to NeuronVisualizationGL!");

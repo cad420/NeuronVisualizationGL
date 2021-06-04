@@ -7,7 +7,7 @@
 
 #include <mpi.h>
 #include <cmath>
-#include <utils/json.h>
+#include <json.hpp>
 #include <fstream>
 #include <iostream>
 
@@ -66,7 +66,7 @@ public:
     }
 
     int GetWindowIndex() const {
-        return world_rank;
+        return ((world_rank == 0) ? 0 : 8);
     }
 
     int GetWindowNum() const {
@@ -98,11 +98,11 @@ public:
     }
 
     int GetTileWindowOffsetX() const {
-        return world_rank % GetWindowColSize();
+        return GetWindowIndex() % GetWindowColSize();
     };
 
     int GetTileWindowOffsetY() const {
-        return world_rank / GetWindowColSize();
+        return GetWindowIndex() / GetWindowColSize();
     };
 
     std::string GetResourcePath() const {

@@ -8,15 +8,21 @@
 #include<glm/gtc/matrix_transform.hpp>
 #include<math.h>
 #include<iostream>
+#include <Window/WindowManager.hpp>
 #include"boundingbox.hpp"
-namespace sv {
-    enum class CameraDefinedKey{
-        MOVE_FASTER,MOVE_SLOWER,ROTATE_FASTER,ROTATE_SLOWER,VIEW_FAR,VIEW_NEAR};
 
-    enum class CameraMoveDirection{
+namespace sv {
+    enum class CameraOperation{
+        NONE,
         FORWARD,BACKWARD,
         LEFT,RIGHT,
-        UP,DOWN
+        UP,DOWN,
+        MOVE_FASTER,MOVE_SLOWER,
+        ROTATE_FASTER,ROTATE_SLOWER,
+        ZOOM_UP, ZOOM_DOWN,
+        TURN_LEFT, TURN_RIGHT,
+        TURN_UP, TURN_DOWN,
+        VIEW_FAR, VIEW_NEAR
     };
 
     class RayCastCamera{
@@ -68,12 +74,25 @@ namespace sv {
             }
         }
         Pyramid getPyramid() const{
+            WindowManager &windowManager = WindowManager::Instance();
             float far_plane_half_h=this->f*tanf(glm::radians(fov/2));
             float far_plane_half_w=far_plane_half_h*ratio;
-            auto lu_pos=camera_pos+f*view_direction+up*far_plane_half_h-right*far_plane_half_w;
-            auto ru_pos=camera_pos+f*view_direction+up*far_plane_half_h+right*far_plane_half_w;
-            auto ld_pos=camera_pos+f*view_direction-up*far_plane_half_h-right*far_plane_half_w;
-            auto rd_pos=camera_pos+f*view_direction-up*far_plane_half_h+right*far_plane_half_w;
+
+            int col = windowManager.GetTileWindowOffsetX();
+            int row = windowManager.GetTileWindowOffsetY();
+            int colNum = windowManager.GetWindowColSize();
+            int rowNum = windowManager.GetWindowRowSize();
+            float farTilePanelH = far_plane_half_h * 2 / rowNum;
+            float farTilePanelW = far_plane_half_w * 2 / colNum;
+
+            auto planeLuPos = camera_pos+f*view_direction+up*far_plane_half_h-right*far_plane_half_w;
+            auto lu_pos = planeLuPos + (col * farTilePanelW) * right - (row * farTilePanelH) * up;
+//            auto ru_pos=camera_pos+f*view_direction+up*far_plane_half_h+right*far_plane_half_w;
+//            auto ld_pos=camera_pos+f*view_direction-up*far_plane_half_h-right*far_plane_half_w;
+//            auto rd_pos=camera_pos+f*view_direction-up*far_plane_half_h+right*far_plane_half_w;
+            auto ru_pos=lu_pos + right * farTilePanelW;
+            auto ld_pos=lu_pos - up * farTilePanelH;
+            auto rd_pos=ru_pos - up * farTilePanelH;
 //            std::cout<<__FUNCTION__ <<std::endl;
 //            print_vec(view_direction);
             return Pyramid(camera_pos,lu_pos,ru_pos,ld_pos,rd_pos);
@@ -90,10 +109,11 @@ namespace sv {
             obb.updateHalfLenVec();
         }
         glm::mat4 RayCastCamera::getViewMatrix();
-        void processMovementByKey(CameraMoveDirection direction,float delta_t);
+        void processMovementByKey(CameraOperation direction,float delta_t);
         void processMouseMove(float xoffset,float yoffset);
         void processMouseScroll(float yoffset);
-        void processKeyForArg(CameraDefinedKey arg);
+        void processKeyForArg(CameraOperation arg);
+        void processCameraOperation(CameraOperation operation, float delta_t);
         void updateCameraVectors() ;
         void updateSpaceXY();
         void setCameraMode(bool is_pers){
@@ -117,18 +137,114 @@ namespace sv {
         glm::vec3 world_up;//keep unit
         float n,f;
         float ratio;
-
         float yaw,pitch;
-
         float move_speed;
         float move_sense;
-    public:
-        float space_x,space_y,space_z;//x-direction and y-direction gap distance between two rays
-        uint32_t half_x_n, half_y_n;
         float fov;
+        float space_x,space_y,space_z;//x-direction and y-direction gap distance between two rays
+    public:
+        uint32_t half_x_n, half_y_n;
         bool is_perspective=false;
 
     };
+
+    inline void RayCastCamera::processCameraOperation(CameraOperation operation, float delta_t) {
+        float ds = move_speed * delta_t;
+        float turnTheta = move_sense * delta_t;
+        const float zoom_sense = 0.005;
+        switch (operation) {
+            case CameraOperation::FORWARD:
+                camera_pos += view_direction * ds;
+                break;
+            case CameraOperation::BACKWARD:
+                camera_pos -= view_direction * ds;
+                break;
+            case CameraOperation::LEFT:
+                camera_pos -= right * ds;
+                break;
+            case CameraOperation::RIGHT:
+                camera_pos += right * ds;
+                break;
+            case CameraOperation::UP:
+                camera_pos += up * ds;
+                break;
+            case CameraOperation::DOWN:
+                camera_pos -= up * ds;
+                break;
+            case CameraOperation::MOVE_FASTER:
+                move_speed *= 2;
+                break;
+            case CameraOperation::MOVE_SLOWER:
+                move_speed /= 2;
+                break;
+            case CameraOperation::ROTATE_FASTER:
+                move_sense *= 2;
+                break;
+            case CameraOperation::ROTATE_SLOWER:
+                move_sense /= 2;
+                break;
+            case CameraOperation::ZOOM_UP:
+                if(!is_perspective) {
+                    space_x -= zoom_sense;
+                    space_y -= zoom_sense;
+                    if (space_x < 0.2f) {
+                        space_x = 0.2f;
+                        space_y = 0.2f;
+                    }
+                }
+                else{
+                    fov+=0.1f;
+                    if(fov>90.f){
+                        fov=90.f;
+                    }
+                    updateSpaceXY();
+                }
+                break;
+            case CameraOperation::ZOOM_DOWN:
+                if(!is_perspective) {
+                    space_x += zoom_sense;
+                    space_y += zoom_sense;
+                    if (space_x > 1.5f) {
+                        space_x = 1.5f;
+                        space_y = 1.5f;
+                    }
+                }
+                else{
+                    fov-=0.1f;
+                    if(fov<0.1f){
+                        fov=0.1f;
+                    }
+                    updateSpaceXY();
+                }
+                break;
+            case CameraOperation::TURN_UP:
+                pitch += turnTheta;
+                if(pitch>60.0f)
+                    pitch=60.0f;
+                updateCameraVectors();
+                break;
+            case CameraOperation::TURN_DOWN:
+                pitch -= turnTheta;
+                if(pitch<-60.0f)
+                    pitch=-60.0f;
+                updateCameraVectors();
+                break;
+            case CameraOperation::TURN_LEFT:
+                yaw += turnTheta;
+                updateCameraVectors();
+                break;
+            case CameraOperation::TURN_RIGHT:
+                yaw -= turnTheta;
+                updateCameraVectors();
+                break;
+            case CameraOperation::VIEW_FAR:
+                f *= 1.1f;
+            case CameraOperation::VIEW_NEAR:
+                f *= 0.9f;
+            case CameraOperation::NONE:
+                break;
+        }
+    }
 
 
     inline glm::mat4 RayCastCamera::getViewMatrix()
@@ -143,16 +259,16 @@ namespace sv {
 
     }
 
-    inline void RayCastCamera::processMovementByKey(CameraMoveDirection direction, float delta_t) {
+    inline void RayCastCamera::processMovementByKey(CameraOperation direction, float delta_t) {
 //        std::cout<<__FUNCTION__ <<std::endl;
         float ds=move_speed*delta_t;
         switch (direction) {
-            case CameraMoveDirection::FORWARD: camera_pos+=view_direction*ds;break;
-            case CameraMoveDirection::BACKWARD: camera_pos-=view_direction*ds;break;
-            case CameraMoveDirection::LEFT: camera_pos-=right*ds;break;
-            case CameraMoveDirection::RIGHT: camera_pos+=right*ds;break;
-            case CameraMoveDirection::UP: camera_pos+=up*ds;break;
-            case CameraMoveDirection::DOWN: camera_pos-=up*ds;break;
+            case CameraOperation::FORWARD: camera_pos+=view_direction*ds;break;
+            case CameraOperation::BACKWARD: camera_pos-=view_direction*ds;break;
+            case CameraOperation::LEFT: camera_pos-=right*ds;break;
+            case CameraOperation::RIGHT: camera_pos+=right*ds;break;
+            case CameraOperation::UP: camera_pos+=up*ds;break;
+            case CameraOperation::DOWN: camera_pos-=up*ds;break;
         }
 
     }
@@ -200,18 +316,18 @@ namespace sv {
 //        std::cout<<"space: "<<space_x<<std::endl;
     }
 
-    inline void RayCastCamera::processKeyForArg(CameraDefinedKey arg) {
-        if(arg==CameraDefinedKey::MOVE_FASTER)
+    inline void RayCastCamera::processKeyForArg(CameraOperation arg) {
+        if(arg==CameraOperation::MOVE_FASTER)
             move_speed*=2;
-        else if(arg==CameraDefinedKey::MOVE_SLOWER)
+        else if(arg==CameraOperation::MOVE_SLOWER)
             move_speed/=2;
-        else if(arg==CameraDefinedKey::ROTATE_FASTER)
+        else if(arg==CameraOperation::ROTATE_FASTER)
             move_sense*=2;
-        else if(arg==CameraDefinedKey::ROTATE_SLOWER)
+        else if(arg==CameraOperation::ROTATE_SLOWER)
             move_sense/=2;
-        else if(arg==CameraDefinedKey::VIEW_FAR)
+        else if(arg==CameraOperation::VIEW_FAR)
             f*=1.1f;
-        else if(arg==CameraDefinedKey::VIEW_NEAR)
+        else if(arg==CameraOperation::VIEW_NEAR)
             f*=0.9f;
     }
 

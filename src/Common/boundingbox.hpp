@@ -231,7 +231,6 @@ namespace sv {
         }
 
         void reshape(float len){
-            left_up_pos=glm::normalize(left_up_pos-start_pos)*len+start_pos;
             right_up_pos=glm::normalize(right_up_pos-start_pos)*len+start_pos;
             left_down_pos=glm::normalize(left_down_pos-start_pos)*len+start_pos;
             right_down_pos=glm::normalize(right_down_pos-start_pos)*len+start_pos;
@@ -260,8 +259,9 @@ namespace sv {
             glm::vec3 far_center_pos=(left_up_pos+right_up_pos+left_down_pos+right_down_pos)/4.f;
             glm::vec3 obb_center_pos=(far_center_pos+start_pos)/2.f;
             glm::vec3 obb_x=right_up_pos-left_up_pos;
-            glm::vec3 obb_y=left_up_pos-left_down_pos;
             glm::vec3 obb_z=start_pos-far_center_pos;
+            glm::vec3 obb_y=glm::cross(obb_x, obb_z);
+//            glm::vec3 obb_y=left_up_pos-left_down_pos;
             return OBB(obb_center_pos,obb_x,obb_y,obb_z,glm::length(obb_x)/2,glm::length(obb_y)/2,glm::length(obb_z)/2);
         }
 
@@ -296,6 +296,7 @@ namespace sv {
         auto v2=glm::normalize(right_down_pos-left_up_pos);
 //        auto normal=glm::normalize(glm::cross(v0,v1));
 //        std::cout<<__FUNCTION__ <<std::endl;
+//        std::cout << glm::dot(glm::cross(v0,v1),v2) << std::endl;
         if(std::fabs(glm::dot(glm::cross(v0,v1),v2))>FLOAT_ZERO){
 //            print_vec(normal);
 //            print_vec(v2);
@@ -305,14 +306,14 @@ namespace sv {
             return false;
         }
 
-        auto center_pos=((left_up_pos+right_up_pos)/2.f+(left_down_pos+right_down_pos)/2.f)/2.f;
-        auto s2e=glm::normalize(center_pos-start_pos);
-        if(std::fabs(glm::dot(s2e,v0))>FLOAT_ZERO){
-            std::cout<<v0.x<<" "<<v0.y<<" "<<v0.z<<std::endl;
-            std::cout<<s2e.x<<" "<<s2e.y<<" "<<s2e.z<<std::endl;
-            std::cout<<"std::fabs(glm::dot(s2e,v0)): "<<std::fabs(glm::dot(s2e,v0))<<std::endl;
-            return false;
-        }
+//        auto center_pos=((left_up_pos+right_up_pos)/2.f+(left_down_pos+right_down_pos)/2.f)/2.f;
+//        auto s2e=glm::normalize(center_pos-start_pos);
+//        if(std::fabs(glm::dot(s2e,v0))>FLOAT_ZERO){
+//            std::cout<<v0.x<<" "<<v0.y<<" "<<v0.z<<std::endl;
+//            std::cout<<s2e.x<<" "<<s2e.y<<" "<<s2e.z<<std::endl;
+//            std::cout<<"std::fabs(glm::dot(s2e,v0)): "<<std::fabs(glm::dot(s2e,v0))<<std::endl;
+//            return false;
+//        }
         return true;
     }
     inline void Pyramid::calc_coefficient() {

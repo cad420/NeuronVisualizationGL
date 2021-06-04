@@ -24,6 +24,8 @@ class BlockReqInfo;
 
 class LargeVolumeManager;
 
+class WindowManager;
+
 class LargeVolumeRenderer final{
 public:
     LargeVolumeRenderer(int w=1200,int h=900);
@@ -162,5 +164,6 @@ private:
     std::unique_ptr<sv::Shader> raycasting_shader;
     std::unique_ptr<sv::Shader> raycast_pos_shader;
 
+    const WindowManager &windowManager;
 };
 #endif //NEURONVISUALIZATIONGL_LARGE_VOLUME_RENDERER_H
