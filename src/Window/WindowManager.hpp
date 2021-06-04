@@ -66,7 +66,7 @@ public:
     }
 
     int GetWindowIndex() const {
-        return ((world_rank == 0) ? 0 : 8);
+        return world_rank;
     }
 
     int GetWindowNum() const {
