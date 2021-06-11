@@ -1,9 +1,9 @@
 {
-  "width": 4000,
-  "height": 600,
-  "lod_file": "G:/MouseNeuronData/mouse_file_config.json",
+  "width": 1200,
+  "height": 900,
+  "lod_file": "E:/MouseNeuronData/mouse_file_config.json",
   "row" : 1,
-  "col" : 10,
+  "col" : 2,
   "screen" : [
     {
       "offsetX" : 200,
@@ -11,7 +11,7 @@
       "resourcePath" : "G:\\MouseNeuronData/mouse_23389_29581_10296_9p2_lod1.h264"
     },
     {
-      "offsetX" : 650,
+      "offsetX" : 800,
       "offsetY" : 200,
       "resourcePath" : "G:\\MouseNeuronData/mouse_23389_29581_10296_9p2_lod1.h264"
     },
@@ -72,7 +72,7 @@
     "up": [0.0,1.0,0.0],
     "zoom": 45.0,
     "n": 1.0,
-    "f": 2048.0
+    "f": 5048.0
   },
   "tf": {
     "0": [0.0,0.1,0.6,0.0],
