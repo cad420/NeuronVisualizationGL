@@ -650,7 +650,7 @@ void LargeVolumeRenderer::setupSystemInfo() {
     GL_EXPR(glGetIntegerv(GPU_MEMORY_INFO_TOTAL_AVAILABEL_MEMORY_NVX,&total_available_mem));
     GL_EXPR(glGetIntegerv(GPU_MEMORY_INFO_CURRENT_AVAILABEL_VIDEMEM_NVX,&current_available_mem));
 
-    vol_tex_block_nx=2;
+    vol_tex_block_nx=4;
     vol_tex_block_ny=2;
     vol_tex_block_nz=2;
     vol_tex_num=3;
