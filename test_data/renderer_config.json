@@ -2,7 +2,7 @@
   "width": 1200,
   "height": 900,
   "lod_file": "E:/MouseNeuronData/mouse_file_config.json",
-  "row" : 1,
+  "row" : 2,
   "col" : 2,
   "screen" : [
     {
@@ -21,7 +21,7 @@
       "resourcePath" : "G:\\MouseNeuronData/mouse_23389_29581_10296_9p2_lod1.h264"
     },
     {
-      "offsetX" : 650,
+      "offsetX" : 800,
       "offsetY" : 200,
       "resourcePath" : "G:\\MouseNeuronData/mouse_23389_29581_10296_9p2_lod1.h264"
     },
