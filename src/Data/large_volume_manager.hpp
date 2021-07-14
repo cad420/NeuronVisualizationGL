@@ -48,12 +48,15 @@ class LargeVolumeReader;
 class LargeVolumeManager{
 public:
     explicit LargeVolumeManager(const char* lod_config_file);
+    explicit LargeVolumeManager(const char* lod_config_file,CUcontext ctx);
     explicit LargeVolumeManager(const std::unordered_map<int,std::string>&);
     LargeVolumeManager(const LargeVolumeManager&)=delete;
     LargeVolumeManager(LargeVolumeManager&&)=delete;
     ~LargeVolumeManager();
 
 public:
+    void setCUDActx(CUcontext ctx);
+
     auto getVolumeInfo()->std::tuple<uint32_t,uint32_t,uint32_t,uint32_t,std::array<uint32_t,3>>  ;
 
     void setupBlockReqInfo(const BlockReqInfo&);

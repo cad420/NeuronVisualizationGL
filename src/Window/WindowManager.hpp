@@ -48,6 +48,7 @@ public:
         windowHeight = config["height"];
         rowNum = config["row"];
         colNum = config["col"];
+        nGPUHost= config["nGPUHost"];
 
         auto screenConfig = config["screen"][GetWindowIndex()];
         offsetX = screenConfig["offsetX"];
@@ -128,9 +129,12 @@ public:
     int GetBlockNumY() const {
         return blockNy;
     }
-
+    int GetGPUNumPerHost() const{
+        return nGPUHost;
+    }
 private:
     int windowWidth = 400, windowHeight = 400;
+    int nGPUHost=1;
     int rowNum = 1, colNum = 1;
     int world_rank = 0, world_size = 1;
     int offsetX = 0, offsetY = 0;

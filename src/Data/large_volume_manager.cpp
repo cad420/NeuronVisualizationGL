@@ -104,7 +104,14 @@ LargeVolumeManager::LargeVolumeManager(const std::unordered_map<int, std::string
     initResource();
     startWorking();
 }
-
+LargeVolumeManager::LargeVolumeManager(const char *lod_config_file, CUcontext ctx)
+:stop(false)
+{
+    setCUDActx(ctx);
+    this->volume_reader=std::make_unique<LargeVolumeReader>(lod_config_file);
+    initResource();
+    startWorking();
+}
 LargeVolumeManager::~LargeVolumeManager() {
     this->stop=true;
     package_cv.notify_all();
@@ -126,10 +133,10 @@ void LargeVolumeManager::initResource() {
 }
 
 void LargeVolumeManager::initCUResource() {
-    CUDA_DRIVER_API_CALL(cuInit(0));
-    CUdevice cu_device;
-    CUDA_DRIVER_API_CALL(cuDeviceGet(&cu_device,0));
-    cuCtxCreate(&cu_context,0,cu_device);
+//    CUDA_DRIVER_API_CALL(cuInit(0));
+//    CUdevice cu_device;
+//    CUDA_DRIVER_API_CALL(cuDeviceGet(&cu_device,0));
+//    cuCtxCreate(&cu_context,0,cu_device);
 
     assert(block_length);
     uint64_t block_byte_size=(uint64_t)block_length*block_length*block_length;
@@ -155,6 +162,7 @@ void LargeVolumeManager::initUtilResource() {
     uncmp_opts.width=header_info.frame_width;
     uncmp_opts.height=header_info.frame_height;
     uncmp_opts.use_device_frame_buffer=true;
+    uncmp_opts.cu_ctx=this->cu_context;
     for(int i=0;i<WORKER_NUM;i++){
         workers.emplace_back(uncmp_opts);
     }
@@ -272,3 +280,8 @@ bool LargeVolumeManager::getBlock(BlockDesc &block) {
 void LargeVolumeManager::updateCUMemPool(CUdeviceptr cu_mem) {
     this->cu_mem_pool->returnCUMem(cu_mem);
 }
+void LargeVolumeManager::setCUDActx(CUcontext ctx)
+{
+    this->cu_context=ctx;
+}
+

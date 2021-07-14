@@ -4,6 +4,7 @@
   "lod_file": "E:/MouseNeuronData/mouse_file_config.json",
   "row" : 2,
   "col" : 2,
+  "nGPUHost": 1,
   "screen" : [
     {
       "offsetX" : 200,

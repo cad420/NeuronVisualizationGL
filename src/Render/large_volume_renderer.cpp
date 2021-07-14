@@ -30,7 +30,7 @@ LargeVolumeRenderer::~LargeVolumeRenderer() {
 }
 
 void LargeVolumeRenderer::set_volume(const char *volume_file) {
-    this->volume_manager=std::make_unique<LargeVolumeManager>(volume_file);
+    this->volume_manager=std::make_unique<LargeVolumeManager>(volume_file,cu_context);
     setupVolumeInfo();
     setupSystemInfo();
     createResource();
@@ -727,7 +727,8 @@ void LargeVolumeRenderer::initGL() {
 void LargeVolumeRenderer::initCUDA() {
     CUDA_DRIVER_API_CALL(cuInit(0));
     CUdevice cuDevice=0;
-    CUDA_DRIVER_API_CALL(cuDeviceGet(&cuDevice, 0));
+    auto iGPU=windowManager.GetWindowIndex()%windowManager.GetGPUNumPerHost();
+    CUDA_DRIVER_API_CALL(cuDeviceGet(&cuDevice, iGPU));
     CUDA_DRIVER_API_CALL(cuCtxCreate(&cu_context,0,cuDevice));
 }
 
