@@ -98,7 +98,7 @@ void LargeVolumeRenderer::setupShaderUniform() {
     raycasting_shader->setFloat("ka",0.5f);
     raycasting_shader->setFloat("kd",0.8f);
     raycasting_shader->setFloat("shininess",100.0f);
-    raycasting_shader->setFloat("ks",1.0f);
+    raycasting_shader->setFloat("ks",0.3f);
     raycasting_shader->setVec3("light_direction",glm::normalize(glm::vec3(-1.0f,-1.0f,-1.0f)));
 
     raycasting_shader->setUInt("window_width",window_width);
@@ -142,7 +142,10 @@ void LargeVolumeRenderer::render() {
         process_input(window,delta_t);
 
 
-        bool intersect=updateCurrentBlocks(camera->getPyramid());
+        bool intersect;
+        START_CPU_TIMER
+        intersect=updateCurrentBlocks(camera->getPyramid());
+        END_CPU_TIMER
 
         if(intersect){
             updateNewNeedBlocksInCache();
@@ -653,7 +656,7 @@ void LargeVolumeRenderer::setupSystemInfo() {
     vol_tex_block_nx=4;
     vol_tex_block_ny=2;
     vol_tex_block_nz=2;
-    vol_tex_num=3;
+    vol_tex_num=5;
     uint64_t single_texture_size=((uint64_t)vol_tex_block_nx*vol_tex_block_ny*vol_tex_block_nz*block_length*block_length*block_length)/1024;
     std::cout<<"single_texture_size: "<<single_texture_size<<std::endl;
     if(single_texture_size*vol_tex_num>current_available_mem){

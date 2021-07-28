@@ -113,7 +113,7 @@ void main()
     cur_lod=min_lod;
     int lod_t=int(pow(2,cur_lod));
     float lod_step=lod_t*step;
-    for(int i=0;i<3000;i++){
+    for(int i=0;i<6000;i++){
         int return_flag=virtualSample(lod_t,sample_pos,sample_scalar);
 
 
