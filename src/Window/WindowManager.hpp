@@ -5,23 +5,25 @@
 #ifndef VOLUMERENDERER_WINDOWMANAGER_H
 #define VOLUMERENDERER_WINDOWMANAGER_H
 
-#include <mpi.h>
 #include <cmath>
-#include <json.hpp>
 #include <fstream>
 #include <iostream>
+#include <json.hpp>
+#include <mpi.h>
 
 using json = nlohmann::json;
 
-
-class WindowManager {
-public:
-    static WindowManager &Instance() {
+class WindowManager
+{
+  public:
+    static WindowManager &Instance()
+    {
         static WindowManager _instance;
         return _instance;
     }
 
-    void Init(int width, int height, int row, int col) {
+    void Init(int width, int height, int row, int col)
+    {
         windowWidth = width;
         windowHeight = height;
         rowNum = row;
@@ -32,7 +34,8 @@ public:
         MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     }
 
-    void Init(const std::string& configPath) {
+    void Init(const std::string &configPath)
+    {
         MPI_Init(nullptr, nullptr);
         MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
         MPI_Comm_size(MPI_COMM_WORLD, &world_size);
@@ -48,7 +51,7 @@ public:
         windowHeight = config["height"];
         rowNum = config["row"];
         colNum = config["col"];
-        nGPUHost= config["nGPUHost"];
+        nGPUHost = config["nGPUHost"];
 
         auto screenConfig = config["screen"][GetWindowIndex()];
         offsetX = screenConfig["offsetX"];
@@ -56,85 +59,105 @@ public:
         resourcePath = screenConfig["resourcePath"];
         auto blockNxJson = screenConfig["blockNx"];
         auto blockNyJson = screenConfig["blockNy"];
-        if(blockNxJson.is_null()) {
+        if (blockNxJson.is_null())
+        {
             isFixedBlockNum = false;
         }
-        else {
+        else
+        {
             isFixedBlockNum = true;
             blockNx = blockNxJson;
             blockNy = blockNyJson;
         }
     }
 
-    int GetWindowIndex() const {
+    int GetWindowIndex() const
+    {
         return world_rank;
     }
 
-    int GetWindowNum() const {
+    int GetWindowNum() const
+    {
         return world_size;
     }
 
-    int GetWindowRowSize() const {
+    int GetWindowRowSize() const
+    {
         return rowNum;
     }
 
-    int GetWindowColSize() const {
+    int GetWindowColSize() const
+    {
         return colNum;
     }
 
-    int GetTileWindowWidth() const {
+    int GetTileWindowWidth() const
+    {
         return windowWidth / GetWindowColSize();
     }
 
-    int GetTileWindowHeight() const {
+    int GetTileWindowHeight() const
+    {
         return windowHeight / GetWindowRowSize();
     }
 
-    int GetWholeWindowWidth() const {
+    int GetWholeWindowWidth() const
+    {
         return windowWidth;
     }
 
-    int GetWholeWindowHeight() const {
+    int GetWholeWindowHeight() const
+    {
         return windowHeight;
     }
 
-    int GetTileWindowOffsetX() const {
+    int GetTileWindowOffsetX() const
+    {
         return GetWindowIndex() % GetWindowColSize();
     };
 
-    int GetTileWindowOffsetY() const {
+    int GetTileWindowOffsetY() const
+    {
         return GetWindowIndex() / GetWindowColSize();
     };
 
-    std::string GetResourcePath() const {
+    std::string GetResourcePath() const
+    {
         return resourcePath;
     }
 
-    int GetWindowLocationOffsetX() const {
+    int GetWindowLocationOffsetX() const
+    {
         return offsetX;
     }
 
-    int GetWindowLocationOffsetY() const {
+    int GetWindowLocationOffsetY() const
+    {
         return offsetY;
     }
 
-    bool IsFixedBlockNum() const {
+    bool IsFixedBlockNum() const
+    {
         return isFixedBlockNum;
     }
 
-    int GetBlockNumX() const {
+    int GetBlockNumX() const
+    {
         return blockNx;
     }
 
-    int GetBlockNumY() const {
+    int GetBlockNumY() const
+    {
         return blockNy;
     }
-    int GetGPUNumPerHost() const{
+    int GetGPUNumPerHost() const
+    {
         return nGPUHost;
     }
-private:
+
+  private:
     int windowWidth = 400, windowHeight = 400;
-    int nGPUHost=1;
+    int nGPUHost = 1;
     int rowNum = 1, colNum = 1;
     int world_rank = 0, world_size = 1;
     int offsetX = 0, offsetY = 0;
@@ -144,5 +167,4 @@ private:
     WindowManager() = default;
 };
 
-
-#endif //VOLUMERENDERER_WINDOWMANAGER_H
+#endif // VOLUMERENDERER_WINDOWMANAGER_H

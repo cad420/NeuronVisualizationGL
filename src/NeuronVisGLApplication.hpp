@@ -5,12 +5,13 @@
 #ifndef NEURONVISUALIZATIONGL_NEURONVISUALIZATIONGLAPPLICATION_H
 #define NEURONVISUALIZATIONGL_NEURONVISUALIZATIONGLAPPLICATION_H
 
-class NeuronVisGLApplication{
-public:
-    NeuronVisGLApplication()=default;
-    int run(int argc,char** argv);
-private:
+class NeuronVisGLApplication
+{
+  public:
+    NeuronVisGLApplication() = default;
+    int run(int argc, char **argv);
 
+  private:
 };
 
-#endif //NEURONVISUALIZATIONGL_NEURONVISUALIZATIONGLAPPLICATION_H
+#endif // NEURONVISUALIZATIONGL_NEURONVISUALIZATIONGLAPPLICATION_H
