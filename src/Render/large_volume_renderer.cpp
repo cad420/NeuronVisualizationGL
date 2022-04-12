@@ -416,6 +416,7 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid &view_pyramid)
     std::unordered_set<sv::AABB, Myhash> current_pyramid_intersect_blocks;
     std::unordered_set<sv::AABB, Myhash> preload_pyramid_intersect_blocks;
 
+    //计算与当前相机视锥体所代表的AABB相交的数据块
     for (auto &it : virtual_blocks[min_lod])
     {
         if (view_aabb.intersect(it))
@@ -426,6 +427,7 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid &view_pyramid)
 
     aabb_intersect_num = current_aabb_intersect_blocks.size();
 
+    //进一步计算与视锥体代表的OBB相交的数据块
     for (auto &it : current_aabb_intersect_blocks)
     {
         if (view_obb.intersect_obb(it.convertToOBB()))
@@ -436,6 +438,7 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid &view_pyramid)
 
     obb_intersect_num = current_obb_intersect_blocks.size();
 
+    //进一步计算与视锥体相交的数据块
     for (auto &it : current_obb_intersect_blocks)
     {
         if (view_pyramid.intersect_aabb(it))
@@ -446,6 +449,7 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid &view_pyramid)
 
     pyramid_intersect_num = current_pyramid_intersect_blocks.size();
 
+    //根据混合分辨策略 由lod0相交的块转换为各个lod所需的数据块
     refineCurrentIntersectBlocks(current_pyramid_intersect_blocks);
 
     refined_intersect_num = current_pyramid_intersect_blocks.size();
@@ -458,6 +462,8 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid &view_pyramid)
 
     assert(new_need_blocks.empty());
     assert(no_need_blocks.empty());
+
+    //更新当前帧新需要的数据块 相对于上一帧不需要的数据块 以及当前帧绘制需要的数据块
 
     for (auto &it : current_pyramid_intersect_blocks)
     {
@@ -477,6 +483,8 @@ bool LargeVolumeRenderer::updateCurrentBlocks(const sv::Pyramid &view_pyramid)
     no_need_block_num = no_need_blocks.size();
 
     current_blocks = std::move(current_pyramid_intersect_blocks);
+
+    //将当前帧相对于上一帧不再需要的数据块的页表项valid设为false
 
     for (auto &it : volume_tex_manager)
     {
@@ -513,6 +521,7 @@ auto LargeVolumeRenderer::getBlockRequestInfo() -> BlockReqInfo
 
 void LargeVolumeRenderer::updateNewNeedBlocksInCache()
 {
+    //如果所需的数据块已经加载到显存了 则将其从new_need_blocks中删除 并修改对应的页表项为valid
     for (auto &it : volume_tex_manager)
     {
         // find cached but invalid block in texture

@@ -39,6 +39,9 @@ class CUMem
     CUdeviceptr data_ptr;
     atomic_wrapper<bool> status;
 };
+
+//简单的cuda内存池 每次只能从这里申请cuda内存 如果内存池里内存不够 则会等待
+
 class CUMemPool
 {
   public:
@@ -193,6 +196,9 @@ void LargeVolumeManager::initUtilResource()
 
 void LargeVolumeManager::startWorking()
 {
+    //working_line是一个用于加载数据块的线程
+    //如果能找到一个空闲的worker 则对其派发任务 否则wait
+    //对于worker 如果有加载任务 即packages非空 则加载任务 否则等待packages非空
     this->working_line = std::thread([&]() -> void {
         while (true)
         {

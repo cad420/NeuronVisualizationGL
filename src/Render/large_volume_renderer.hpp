@@ -88,10 +88,10 @@ private:
 
 private:
     struct BlockTableItem{
-        std::array<uint32_t,4> block_index;
-        std::array<uint32_t,4> pos_index;
-        bool valid;
-        bool cached;
+        std::array<uint32_t,4> block_index; //数据块的索引
+        std::array<uint32_t,4> pos_index; //显存中的位置
+        bool valid; //是否被使用中
+        bool cached; //是否有数据块存储当中
     };
 private:
     bool updateCurrentBlocks(const sv::Pyramid& view_pyramid);
@@ -120,6 +120,9 @@ private:
     std::vector<GLuint> volume_texes;
     std::list<BlockTableItem> volume_tex_manager;
 
+    //页表的大小等于所有lod的数据块数目
+    //每一个block索引都可以转为线性的一维索引
+    //页表中存储的是该块对应存储在显存中的位置 其中前三项是三维显存中的偏移 第四项低16位存储显存纹理的编号 高16位表示该块对应的数据是否有效
     GLuint mapping_table_ssbo;
     std::vector<uint32_t> mapping_table;
     std::vector<uint32_t> lod_mapping_table_offset;
